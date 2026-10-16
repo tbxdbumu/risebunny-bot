@@ -1,57 +1,12 @@
-## Unity ##
-
-*.cs diff=csharp text
-*.cginc text
-*.shader text
-
-*.mat merge=unityyamlmerge eol=lf
-*.anim merge=unityyamlmerge eol=lf
-*.unity merge=unityyamlmerge eol=lf
-*.prefab merge=unityyamlmerge eol=lf
-*.physicsMaterial2D merge=unityyamlmerge eol=lf
-*.physicMaterial merge=unityyamlmerge eol=lf
-*.asset merge=unityyamlmerge eol=lf
-*.meta merge=unityyamlmerge eol=lf
-*.controller merge=unityyamlmerge eol=lf
-
-
-## git-lfs ##
-
-#Image
-*.jpg filter=lfs diff=lfs merge=lfs -text
-*.jpeg filter=lfs diff=lfs merge=lfs -text
-*.png filter=lfs diff=lfs merge=lfs -text
-*.gif filter=lfs diff=lfs merge=lfs -text
-*.psd filter=lfs diff=lfs merge=lfs -text
-*.ai filter=lfs diff=lfs merge=lfs -text
-*.tif filter=lfs diff=lfs merge=lfs -text
-
-#Audio
-*.mp3 filter=lfs diff=lfs merge=lfs -text
-*.wav filter=lfs diff=lfs merge=lfs -text
-*.ogg filter=lfs diff=lfs merge=lfs -text
-
-#Video
-*.mp4 filter=lfs diff=lfs merge=lfs -text
-*.mov filter=lfs diff=lfs merge=lfs -text
-
-#3D Object
-*.FBX filter=lfs diff=lfs merge=lfs -text
-*.fbx filter=lfs diff=lfs merge=lfs -text
-*.blend filter=lfs diff=lfs merge=lfs -text
-*.obj filter=lfs diff=lfs merge=lfs -text
-
-#ETC
-*.a filter=lfs diff=lfs merge=lfs -text
-*.exr filter=lfs diff=lfs merge=lfs -text
-*.tga filter=lfs diff=lfs merge=lfs -text
-*.pdf filter=lfs diff=lfs merge=lfs -text
-*.zip filter=lfs diff=lfs merge=lfs -text
-*.dll filter=lfs diff=lfs merge=lfs -text
-*.unitypackage filter=lfs diff=lfs merge=lfs -text
-*.aif filter=lfs diff=lfs merge=lfs -text
-*.ttf filter=lfs diff=lfs merge=lfs -text
-*.rns filter=lfs diff=lfs merge=lfs -text
-*.reason filter=lfs diff=lfs merge=lfs -text
-*.lxo filter=lfs diff=lfs merge=lfs -text
-*.bc filter=lfs diff=lfs merge=lfs -text
+# RiseBunny bot deposu — satır sonu / LFS politikası
+#
+# ESKİ HALİ: şablondan gelme Unity + git-LFS kurallarıydı (*.png, *.dll için
+# filter=lfs; *.unity, *.cs için merge/diff driver'ları). Bu repoda tek bir ikili
+# dosya bile yok; ama kural durduğu için ileride eklenecek bir .png sessizce
+# LFS'e gidip GitHub'da bozuk (sadece pointer dosyası) görünürdü. Kaldırıldı.
+#
+# BİLİNÇLİ OLARAK `text` / `eol` / `-binary` kuralı YOK:
+# Windows'ta core.autocrlf=true olduğu için dosyalar diskte CRLF, index'te LF.
+# Buraya bir `text` veya `-text` kuralı eklemek tüm .js/.json dosyalarını
+# yeniden normalize eder ve boş yere "bütün dosya değişmiş" diff'i üretir.
+# Bir kural eklemeyi düşünüyorsan önce: git add --renormalize . ile dene.
