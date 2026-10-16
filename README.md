@@ -55,6 +55,11 @@ npm start
 yetkisiyle silip yazabilir; bu yüzden dosyayı yalnızca kendi makinanızda ve
 Render'ın ortam değişkenlerinde tutun.
 
+`ayarlar.json` da (sahip ID, premium üye ID'leri, log kanal ID'leri) repoda değil.
+29 komut ve `events/ready.js` onu `require` ettiği için bot açılışta eksik dosyayı
+`ayarlar.example.json`'dan otomatik üretir; böylece GitHub'dan deploy sessizce
+çökmez. Değerleri env ile de verebilirsiniz: `SAHIP_ID`, `OWNER_LOG_CHANNEL_ID`.
+
 ### Zorunlu ortam değişkenleri
 
 | Değişken | Nereden alınır |
@@ -63,6 +68,8 @@ Render'ın ortam değişkenlerinde tutun.
 | `FIREBASE_SERVICE_ACCOUNT_PATH` | Firebase Console → Project Settings → Service accounts → Generate new private key |
 | `FIREBASE_PROJECT_ID` | Firebase Console → Project Settings → General |
 | `BOT_API_SECRET` | Kendiniz üretin: `openssl rand -hex 32` (site tarafıyla aynı olmalı) |
+| `SAHIP_ID` | Discord'da kendine sağ tık → Copy User ID (ayarlar.json üretilirken yazılır) |
+| `OWNER_LOG_CHANNEL_ID` | Hataların düşeceği log kanalının ID'si |
 | `TOPGG_TOKEN` | top.gg → Manage → Webhooks & API (opsiyonel) |
 | `GROQ_API_KEY` | console.groq.com/keys (opsiyonel, bulut AI için) |
 

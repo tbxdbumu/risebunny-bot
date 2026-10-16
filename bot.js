@@ -2,6 +2,27 @@ require("dotenv").config();
 console.log("[Boot] RiseBunny v2.1.1 (kupon-fix) yükleniyor...");
 const path = require("path");
 
+/* ayarlar.json kasıtlı olarak repoda yok (sahip ID + premium üye ID'leri + log
+   kanal ID'leri sızmasın diye .gitignore'da). Oysa 29 komut ve events/ready.js
+   onu require ediyor → GitHub'dan deploy'da bot "Cannot find module ayarlar.json"
+   ile hiç açılmaz. Eksikse şablondan üret; gerçek ID'leri ayarlar.json'a yazmak
+   yerine env'den vermek istersen SAHIP_ID / OWNER_LOG_CHANNEL_ID kullan. */
+try {
+  const fs = require("fs");
+  const ayarYol = path.join(__dirname, "ayarlar.json");
+  const ornekYol = path.join(__dirname, "ayarlar.example.json");
+  if (!fs.existsSync(ayarYol) && fs.existsSync(ornekYol)) {
+    const ayar = JSON.parse(fs.readFileSync(ornekYol, "utf8"));
+    if (process.env.SAHIP_ID) ayar.sahip = process.env.SAHIP_ID;
+    if (process.env.OWNER_LOG_CHANNEL_ID) ayar.ownerLog = process.env.OWNER_LOG_CHANNEL_ID;
+    if (process.env.PREFIX) ayar.prefix = process.env.PREFIX;
+    fs.writeFileSync(ayarYol, JSON.stringify(ayar, null, 2));
+    console.log("[Boot] ayarlar.json üretildi (şablondan) — sahip/kanal ID'lerini r!komutlarla veya SAHIP_ID env ile gir.");
+  }
+} catch (e) {
+  console.warn("[Boot] ayarlar.json üretilemedi:", e.message);
+}
+
 /* Firestore drop-in veritabanı: croxydb/quick.db'yi require.cache üzerinden
    Firestore destekli shim ile değiştirir. Kimlik yoksa yerel JSON moduna düşer. */
 require("./firestore-db").install();
