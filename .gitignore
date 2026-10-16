@@ -30,3 +30,6 @@ Thumbs.db
 
 # benim urettigim tek-satir anahtar kopyasi (SIR icerir, commit etme)
 *.oneline.txt
+
+# ── Çağlıktan kalan yerel sunucu verisi (canlı ID + üye istatistiği içerir) ──
+Helpers/Servers/
