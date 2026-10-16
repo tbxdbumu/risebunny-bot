@@ -57,7 +57,14 @@
         "you ok",
         "sup",
         "nasılsın bakayım",
-        "noldu"
+        "noldu",
+        "nasılsın bakalım",
+        "nasılsın ya",
+        "how are you doing",
+        "hey how are you doing",
+        "nasılsın bakalım be",
+        "iyi misin söyle",
+        "nasılsın kısacası"
       ],
       "cevap": "Sistemlerim tıkır tıkır çalışıyor! ⚡ Sen nasılsın {{user}}? Bugün nasıl yardımcı olabilirim?\nBir şey merak ediyorsan `rise <soru>` yazman yeterli. 🐰\n\nMy systems are running perfectly! ⚡ How are you {{user}}? Just type `rise <question>` if you need anything!",
       "cevap_en": "My systems are running perfectly! ⚡ How are you {{user}}? Just type `rise <question>` if you need anything!"
@@ -84,7 +91,17 @@
         "hola",
         "good morning",
         "good evening",
-        "hey bot"
+        "hey bot",
+        "merhaba nasılsın",
+        "selam nasılsın",
+        "merhaba arkadaşlar",
+        "hello there",
+        "hey there",
+        "selamün aleyküm nasılsın",
+        "günaydın nasılsın",
+        "iyi akşamlar nasılsın",
+        "mrb nasılsın",
+        "slm ya"
       ],
       "cevap": "Selam {{user}}! 👋 Nasıl yardımcı olabilirim?\nKomutlar için `{{prefix}}yardım`, bana soru sormak için `rise <soru>` yazabilirsin. 🐰\n\nHello {{user}}! 👋 How can I help you? Type `{{prefix}}help` for commands or `rise <question>` to ask me anything!",
       "cevap_en": "Hello {{user}}! 👋 How can I help you? Type `{{prefix}}help` for commands or `rise <question>` to ask me anything!"
@@ -148,7 +165,9 @@
         "sahibiniz risebunny mi",
         "ekibiniz kimdir",
         "risebunny ekibi",
-        "sahibin risebunny mi"
+        "sahibin risebunny mi",
+        "geliştirici kadrosunda kimler var",
+        "ekipte kimler var"
       ],
       "cevap": "Benim geliştiricim **RiseBunny Ekibi**! 👑 Sahibim: `<@985126554306773063>`\nDestek sunucumuz: https://discord.gg/mEfz5SfpbR\nWeb: https://risebunny.vercel.app\n\nMy developer is the **RiseBunny Team**! 👑 Support server: https://discord.gg/mEfz5SfpbR",
       "cevap_en": "My developer is the **RiseBunny Team**! 👑 Support server: https://discord.gg/mEfz5SfpbR • Web: https://risebunny.vercel.app"
@@ -209,7 +228,9 @@
         "komut sayısı",
         "kaç tane komutun var",
         "how many commands",
-        "command count"
+        "command count",
+        "sunucunuzda kaç kişi var",
+        "ekibiniz kaç kişiden oluşuyor"
       ],
       "cevap": "📊 **İstatistiklerim:**\n• Gecikme: **{{ping}}ms**\n• Komut sayısı: **180+**\n• Prefix: `{{prefix}}`\n\nAnlık sunucu/üye sayısını görmek için `{{prefix}}istatistik` komutunu kullanabilirsin.\n\n📊 **My stats:** latency **{{ping}}ms**, 180+ commands. Use `{{prefix}}stats` for live server/member counts.",
       "cevap_en": "📊 **My stats:** latency **{{ping}}ms**, 180+ commands, prefix `{{prefix}}`. Use `{{prefix}}stats` for live server/member counts."
@@ -359,7 +380,15 @@
         "thx",
         "appreciate it",
         "çok teşekkür",
-        "oldu hacı"
+        "oldu hacı",
+        "teşekkürler yardım için",
+        "çok teşekkürler",
+        "thanks a lot",
+        "thank you very much",
+        "thanks for the help",
+        "teşekkür ederim her şey için",
+        "sağol kardeşim",
+        "eyvallah sağol"
       ],
       "cevap": "Rica ederim {{user}}! 😊\nBaşka bir şey ister misin? `rise <soru>` yazarsan yardımcı olayım.\n\nYou're welcome {{user}}! 😊 Need anything else? Just ask `rise <question>`!",
       "cevap_en": "You're welcome {{user}}! 😊 Need anything else? Just ask `rise <question>`!"
@@ -738,7 +767,9 @@
         "is premium worth it",
         "abonelik alsam ne kazanırım",
         "premium bitince ne kaybederim",
-        "web siteden premium alabiliyormuyuz"
+        "web siteden premium alabiliyormuyuz",
+        "xp çarpanı premiumda kaç kat",
+        "premium xp farkı"
       ],
       "cevap": "💎 **Premium Avantajları:**\n• +%50 çalış/komut XP ve para bonusu\n• Çift banka faizi (%2 yerine %4)\n• Günlük premium bonus (`{{prefix}}günlük-bonus`)\n• Premium petler (aslan 🦁, kaplan 🐅)\n• Premium koruma (özel koruma kiti)\n• Destek önceliği\n• `{{prefix}}premium-panel` - Tüm avantajları gör\n\n**Alma yolları:**\n• `{{prefix}}premium-al` - Oyun parasıyla (250.000 💸)\n• Site mağazasından: https://risebunny.vercel.app\n• Kupon koduyla: `{{prefix}}kuponkullan <kod>`\n• Sahip verirse: `{{prefix}}premium-ver @kullanıcı [gün]`\n\n💎 **Premium:** +50% XP/money, double interest, daily bonus, premium pets, priority support. Buy via `{{prefix}}buy-premium`, the site, or a coupon.",
       "cevap_en": "💎 **Premium Benefits:** +50% work/command XP and money, double bank interest (2%→4%), daily premium bonus (`{{prefix}}daily-bonus`), premium pets (lion, tiger), premium protection, priority support, `{{prefix}}premium-panel`. **Get it:** `{{prefix}}buy-premium` (250,000 game money), the website https://risebunny.vercel.app, coupon `{{prefix}}redeem <code>`, or owner `{{prefix}}give-premium @user [days]`."
@@ -789,7 +820,10 @@
         "how to use rise",
         "how to use ai",
         "ask the ai",
-        "ai komutları"
+        "ai komutları",
+        "rise kapatılabilir mi",
+        "ai sunucumda nasıl kapatırım",
+        "rise ı devre dışı bırakma"
       ],
       "cevap": "🤖 **AI ile sohbet:** `rise <soru>` yaz, ben cevap vereyim!\nÖrnek: `rise premium nasıl alınır`, `rise vape nedir`, `rise bankayı nasıl kullanırım`\n• Botun bir mesajına **reply** atarak da sorabilirsin.\n• Komut/eylem de yaptırabilirsin (yetkin varsa): `rise @üye mute at` gibi.\n\n🤖 **AI chat:** type `rise <question>` (or reply to one of my messages). Example: `rise how to get premium`.",
       "cevap_en": "🤖 **AI chat:** type `rise <question>` and I'll answer (or reply to one of my messages). Example: `rise how to get premium`, `rise what is vape`."
@@ -820,7 +854,9 @@
         "how can I teach the bot new answers",
         "how do I teach the ai",
         "how to train the bot",
-        "sana yeni şeyler nasıl öğretilir"
+        "sana yeni şeyler nasıl öğretilir",
+        "öğrettiğim cevabı kim onaylıyor",
+        "ai eğitim onay sistemi"
       ],
       "cevap": "🧠 AI iki şekilde öğreniyor:\n1. **Yerel bilgi tabanı** — hazır soru-cevaplar (cevaplar.json).\n2. **Sahip onaylı öğrenme** — AI cevap veremediğinde sahibi \"Öğret\" butonuyla yeni soru-cevap ekleyebilir; onaylanınca kalıcı olur.\n\nBir şey öğretmek istiyorsan destek sunucumuzda sahibine ilet: https://discord.gg/mEfz5SfpbR\n\n🧠 The AI learns from its built-in knowledge base and from owner-approved teaching. Want to teach it something? Contact the owner in our Discord: https://discord.gg/mEfz5SfpbR",
       "cevap_en": "🧠 The AI learns from its built-in knowledge base and from owner-approved teaching (when it can't answer, the owner can add a Q&A). Want to teach it something? Contact the owner: https://discord.gg/mEfz5SfpbR"
@@ -1159,7 +1195,10 @@
         "why can I not claim daily reward",
         "günlük vermedi lan",
         "kanka günlük vermedi tekrar dener misin",
-        "eski günlüğüm yanmışmı kontrol etme yeri"
+        "eski günlüğüm yanmışmı kontrol etme yeri",
+        "günlük hakkım yanmış mı nasıl anlarım",
+        "günlük yanmış mı kontrol",
+        "günlük hakkımı nasıl kontrol ederim"
       ],
       "cevap": "📅 `{{prefix}}günlük` günlük ödül komutudur. Daha önce aldıysan yeniden kullanılabilmesi için beklemen gerekebilir. Premium günlük bonusu ayrı olarak `{{prefix}}günlük-bonus` ile sunuluyor. Komut hata verirse mevcut prefixi, hata metnini ve varsa bekleme uyarısını kontrol et; destek ticketında paylaşabilirsin.",
       "cevap_en": "📅 `{{prefix}}daily` claims the daily reward. If you already claimed it, you may need to wait before claiming again. The Premium daily bonus is listed separately as `{{prefix}}daily-bonus`. If it errors, check your prefix and any cooldown message, then share the error in a support ticket."
@@ -1370,7 +1409,10 @@
         "buy a pet",
         "adopt a pet command",
         "peti nereden alıom",
-        "pet kaç para"
+        "pet kaç para",
+        "pet fiyatları değişti mi",
+        "pet satınca para hemen düşüyo mu",
+        "pet kaç paraya alınır"
       ],
       "cevap": "🐾 Pet sahiplenmek için `{{prefix}}pet al <tür>` biçimini kullan. Kaynakta tavşan, köpek, kedi, balık, aslan ve kaplan türleri sayılıyor; aslan ve kaplan Premium gerektiriyor. Örnek: `{{prefix}}pet al kedi`.",
       "cevap_en": "🐾 Use `{{prefix}}pet buy <type>` (Turkish syntax: `{{prefix}}pet al <tür>`) to adopt a pet. The source lists rabbit, dog, cat, fish, lion, and tiger; lion and tiger require Premium. Example: `{{prefix}}pet buy cat`."
@@ -1446,7 +1488,10 @@
         "warn command",
         "how to warn someone",
         "uyarı sayımı nerden bakıcam",
-        "warn 3 tane olunca ne oluyo"
+        "warn 3 tane olunca ne oluyo",
+        "yanlış uyarı nasıl silinir",
+        "uyar silme komutu var mı",
+        "warn nasıl geri alınır"
       ],
       "cevap": "⚠️ Üyeye uyarı vermek için `{{prefix}}uyar @kullanıcı <sebep>` komutu kaynakta listeleniyor. Sebebi kısa ve anlaşılır yaz; moderasyon kararlarını sunucu kurallarına göre ver. Uyarı geçmişini görüntüleyen ayrı bir komutun kullanılabilirliği mevcut veri kümesinde açıklanmıyor.",
       "cevap_en": "⚠️ The documented warning command is `{{prefix}}warn @user <reason>` (Turkish: `{{prefix}}uyar`). Give a clear reason and follow your server rules. This dataset does not specify whether a separate command exists to view warning history."
@@ -1502,7 +1547,10 @@
         "missing permissions ban",
         "ban komutu yazınca olmuyo",
         "bot neden ban atamıyo",
-        "bot yetkimiz yok diyo ban atcam diye"
+        "bot yetkimiz yok diyo ban atcam diye",
+        "kick yetkim yok diyo",
+        "yetki hatası ban kick",
+        "bot yetki istiyor kick"
       ],
       "cevap": "🚫 Ban/kick/mute çalışmıyorsa şu noktaları kontrol et: komutu kullanan kişinin Discord yetkileri, botun gerekli izinleri, botun rolünün hedef üyenin rolünden yukarıda olması ve hedefin sunucu sahibi/yetki sınırı içinde olup olmadığı. Hata mesajını incele; yetkileri atlatmaya çalışmak yerine sunucu yöneticisine başvur.",
       "cevap_en": "🚫 If ban/kick/mute fails, check the caller’s Discord permissions, the bot’s permissions, whether the bot’s role is above the target member’s role, and Discord’s role hierarchy restrictions. Read the error and ask a server administrator rather than trying to bypass permissions."
@@ -1635,7 +1683,9 @@
         "close my ticket",
         "delete ticket button",
         "ticket kapatmayı bulamadım",
-        "ticket yanlış kanalda açıldı nasıl silerim"
+        "ticket yanlış kanalda açıldı nasıl silerim",
+        "ticket arşivi nerede",
+        "kapanan ticketlar kayboluyo mu"
       ],
       "cevap": "🎫 Açılmış ticket içinde kaynakta **Kapat** ve **Sil** butonları belirtiliyor. Konuşmayı sonlandırmak istiyorsan Kapat seçeneğini kullan; Sil işlemini seçmeden önce içeriğin artık gerekli olmadığından emin ol. Sunucuya göre butonları yalnızca talep sahibi veya yetkili görebilir.",
       "cevap_en": "🎫 The source describes **Close** and **Delete** buttons inside a ticket. Use Close to end the support conversation; before choosing Delete, make sure the content is no longer needed. Button access may depend on server configuration and permissions."
@@ -1659,7 +1709,9 @@
         "ticket açmak için yetki gerekiyor mu",
         "herkes ticket açabilir mi",
         "ticket permission",
-        "who can open tickets"
+        "who can open tickets",
+        "ticket sayısı limitli mi",
+        "kişi başı kaç ticket açabilirim"
       ],
       "cevap": "🎫 Kaynak, panelden kategori seçerek veya `{{prefix}}ticket <sebep>` ile ticket açılabildiğini söylüyor. Kimlerin ticket açabileceği ve kategori görünürlüğü sunucunun ayarlarına bağlıdır. Seçenek görünmüyorsa destek sunucusuna ulaşabilirsin: https://discord.gg/mEfz5SfpbR.",
       "cevap_en": "🎫 The source says tickets can be opened from the category panel or with `{{prefix}}ticket <reason>`. Who may create tickets and which categories they see depends on server configuration. If the option is missing, contact support at https://discord.gg/mEfz5SfpbR."
@@ -1672,7 +1724,9 @@
         "ticket sebebi örneği",
         "what should i write in a ticket",
         "how to describe my issue",
-        "ticket içine ne yazcam"
+        "ticket içine ne yazcam",
+        "ticket içine resim atılır mı",
+        "ticket ekran görüntüsü ekleme"
       ],
       "cevap": "📝 Ticket açarken kısa ve açıklayıcı bir sebep yaz. Örnek: `{{prefix}}ticket Launcher açılırken hata alıyorum`. Mümkünse hata metnini, ilgili komutu ve sorunun ne zaman başladığını ekle. Şifre, token veya hassas kişisel bilgileri ticket içine gönderme.",
       "cevap_en": "📝 Give your ticket a short, clear reason. Example: `{{prefix}}ticket I get an error when opening the launcher`. Include the exact error, relevant command, and when the issue began. Never include passwords, tokens, or sensitive personal data."
@@ -1765,7 +1819,9 @@
         "check my level",
         "see another users level",
         "seviyemi kartta nerde görürüm",
-        "xp barı nerden bakılıyo"
+        "xp barı nerden bakılıyo",
+        "seviye kartı rengi değişir mi",
+        "seviye kartı özelleştirme"
       ],
       "cevap": "📊 Seviye kartını görüntülemek için `{{prefix}}seviye [@kullanıcı]` komutunu kullan. Başka bir üyeyi kontrol etmek istiyorsan isteğe bağlı kullanıcı etiketini ekle. Komutun tam yazımını sunucunun yardım menüsüyle doğrula.",
       "cevap_en": "📊 Use `{{prefix}}level [@user]` (Turkish: `{{prefix}}seviye`) to view a level card. Add an optional user mention to check another member. Verify the exact syntax in your server’s help menu."
@@ -2009,7 +2065,9 @@
         "cannot log in to launcher",
         "discord login failed",
         "discord ile giriş olmuyo",
-        "discord oauth hatası veriyor girişte"
+        "discord oauth hatası veriyor girişte",
+        "discord oauth 404 diyo",
+        "oauth hatası launcher"
       ],
       "cevap": "🔑 RiseBunny Launcher için kaynakta Discord ile giriş ve Premium doğrulaması anlatılıyor. Discord uygulamasında doğru hesapta olduğundan emin ol, giriş penceresini engelleyen açılır pencere/bağlantı sorunlarını kontrol et ve resmi kurulum dosyasını kullan. Hesabına ait token, şifre veya doğrulama kodunu kimseyle paylaşma.",
       "cevap_en": "🔑 The source says RiseBunny Launcher uses Discord login and verifies Premium. Make sure Discord is signed into the correct account, check for blocked login windows or connection issues, and use the official installer. Never share your account token, password, or verification code."
@@ -2061,7 +2119,9 @@
         "what data does risebunny store",
         "does the bot store my data",
         "hangi verilerimi tutuyorsun",
-        "verilerim hangi sunucuda tutuluyo"
+        "verilerim hangi sunucuda tutuluyo",
+        "site kart bilgisi saklıyor mu",
+        "bot hangi bildirimleri gönderiyor"
       ],
       "cevap": "🔐 Kaynakta, çalışması için Discord ID, sunucu ayarları, ekonomi ve seviye durumu gibi temel verilerin saklandığı belirtiliyor. Veri saklama süresi, silme talebi yöntemi ve tüm alt hizmetlerin ayrıntıları bu dosyada açıklanmıyor. Bu konularda kesin bilgi için destek sunucusuna sor: https://discord.gg/mEfz5SfpbR.",
       "cevap_en": "🔐 The source says the bot stores basic data needed to operate, such as Discord ID, server settings, and economy/level state. Retention periods, deletion requests, and details of every subservice are not specified in this file. Ask support for clarification: https://discord.gg/mEfz5SfpbR."
@@ -2136,7 +2196,11 @@
         "risebunny support nasıl açılır",
         "iletişim linki",
         "contact support",
-        "where can i get help"
+        "where can i get help",
+        "risebunny ekibine nasıl yazılır",
+        "ekibinize nasıl ulaşırım",
+        "ekiple iletişime geçme",
+        "size nasıl yazarım"
       ],
       "cevap": "📨 Destek almak için https://discord.gg/mEfz5SfpbR adresindeki Discord sunucusuna katıl ve uygun kategori altında ticket aç. Sorunu, aldığın hata mesajını ve denediğin adımları açıklarsan ekip daha kolay yardımcı olabilir. Şifre, token veya ödeme kartı bilgisi paylaşma.",
       "cevap_en": "📨 Join https://discord.gg/mEfz5SfpbR and open a ticket in the appropriate category. Describe the issue, exact error, and steps you have tried. Do not share passwords, tokens, or payment-card details."
@@ -2175,7 +2239,9 @@
         "set bot to english",
         "dil tr en komutu",
         "dili değiştirebilir miyim",
-        "nasıl türkçe yapıcam"
+        "nasıl türkçe yapıcam",
+        "bot hangi dilde cevap veriyor",
+        "dil ayarı nasıl yapılır"
       ],
       "cevap": "🌍 Kendi dil tercihini değiştirmek için kaynakta `{{prefix}}dil tr` veya `{{prefix}}dil en`; sunucu dilini ayarlamak için `{{prefix}}dil sunucu tr` örnekleri verilmiş. İngilizce komut eşdeğeri `{{prefix}}lang en` olarak belirtiliyor. Komut yazımı sunucudaki güncel sürümde farklıysa yardım menüsünü kontrol et.",
       "cevap_en": "🌍 To set your language, the source lists `{{prefix}}lang tr` or `{{prefix}}lang en`. For server language, it lists `{{prefix}}lang server tr`. If the exact command differs in your server’s current version, check the help menu."
@@ -2379,7 +2445,10 @@
         "jail nasıl kullanılır",
         "haps komutu discord",
         "what is jail command",
-        "zindana atma komutu var mı"
+        "zindana atma komutu var mı",
+        "jail süresi nasıl ayarlanır",
+        "haps süresi yazma",
+        "zindan süresi nasıl"
       ],
       "cevap": "⛓️ Kaynakta `{{prefix}}jail @kullanıcı` moderasyon komutu olarak listelenmiş, ancak rol/kanal düzeni ve süresi hakkında ayrıntı verilmemiş. Kullanımdan önce sunucunun jail sisteminin yapılandırıldığını ve komutu çalıştırmak için yetkin olduğunu doğrula.",
       "cevap_en": "⛓️ The source lists `{{prefix}}jail @user` as a moderation command, but does not detail its role/channel setup or duration. Before using it, verify that the server’s jail system is configured and that you have permission."
