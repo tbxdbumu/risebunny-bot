@@ -1,0 +1,32 @@
+node_modules/
+
+# ── Sırlar: ASLA github'a yüklenmez ──
+.env
+.env.*
+!.env.example
+firebase-service-account.json
+*.serviceAccount*.json
+serviceAccount*.json
+*.pem
+*.p12
+
+# ── Kullanıcı verisi / veritabanı kopyaları (artık Firestore'da) ──
+croxydb/
+database.json
+quickdb.json
+json.sqlite
+*.sqlite
+giveaways.json
+scan_results.json
+
+# ── Kişeli ID/channel içeren canlı config (yerine ayarlar.example.json commit et) ──
+ayarlar.json
+
+# ── Çöp / yerel ──
+*.log
+*.tmp
+Thumbs.db
+.DS_Store
+
+# benim urettigim tek-satir anahtar kopyasi (SIR icerir, commit etme)
+*.oneline.txt

@@ -1,0 +1,230 @@
+const { EmbedBuilder, PermissionFlagsBits } = require("discord.js");
+const { t, getLang, hasLang, hasGuildLang, hasConsent, komutCoz } = require("../dil");
+const { PREFIX, SAHIP_ID, bakimSebebi, ownerLog, giveCommandXp } = require("../utils");
+const db = require("croxydb");
+const { findClosestCommand } = require("../util/fuzzyMatch");
+const { aiIsle } = require("../ai/handler");
+
+// NOT: Komut kullanımları otomatik olarak sahip loguna DÜŞMEZ.
+// Yanlış/eksik kullanımlar logu kirletmesin diye her komut SADECE
+// işlemi gerçekten tamamlayınca kendi ownerLog/komutLog çağrısını yapar.
+
+// Onay/Terms of Service kontrolü
+async function checkConsent(message, client) {
+  const lang = await getLang(message.author.id);
+  const { t } = require("../dil");
+  
+  // Sahip bypass
+  const { SAHIP_ID } = require("../utils");
+  if (message.author.id === SAHIP_ID) return true;
+  
+  // Onay kontrolü
+  const { hasConsent, getConsent } = require("../dil");
+  if (hasConsent(message.author.id)) return true;
+  
+  // Onay gerekli - panel göster
+  try {
+    const { dilPaneli } = require("../komutlar/dil");
+    await message.reply(dilPaneli(process.env.PREFIX || "r!", { isOwner: false, userNeedsLang: true, guildNeedsLang: false })).catch(() => {});
+  } catch {}
+  await message.reply(t(await getLang(message.author.id), "onay.gerekli")).catch(() => {});
+  return false;
+}
+
+module.exports = async message => {
+  const client = message.client;
+  if (!client || message.author?.bot) return;
+
+  // 🤖 AI SOHBET SİSTEMİ (prefix gerektirmez, DM'de de çalışır)
+  // "rise <soru>" formatında tetiklenir
+  const aiCevapVerdi = await aiIsle(message, client);
+  if (aiCevapVerdi) return;
+
+  // Normal komutlar için sunucu ve üye kontrolü
+  if (!message.guild || !message.member) return;
+
+  const prefix = process.env.PREFIX || PREFIX;
+
+  if (!message.content.startsWith(prefix)) return;
+
+  const parts = message.content.trim().split(/\s+/);
+  const command = parts[0].slice(prefix.length).toLowerCase();
+  const params = parts.slice(1);
+  const perms = typeof client.elevation === "function" ? client.elevation(message) : 0;
+
+  // 🚫 Komut engeli kontrolü (çevirili, 20sn sonra silinir)
+  const engel = db.fetch(`engel_${message.guild.id}`);
+  const isEngelleCmd = ["engelle", "block", "komutengelle", "komut-engelle"].includes(command);
+  const isAdminUser = message.member.permissions.has(PermissionFlagsBits.Administrator);
+  if (engel && !(isEngelleCmd && isAdminUser)) {
+    const aktif = engel.kapsam === "sunucu" || (engel.kapsam === "kanal" && engel.kanalId === message.channel.id);
+    if (aktif) {
+      const ulang = await getLang(message.author.id);
+      const kapsam = engel.kapsam === "sunucu" ? t(ulang, "engelle.engelliKapsamSunucu") : t(ulang, "engelle.engelliKapsamKanal");
+      const e = new EmbedBuilder().setColor("Red")
+        .setTitle(t(ulang, "engelle.engelliBaslik"))
+        .setDescription(t(ulang, "engelle.engelliAciklama", { kullanici: `${message.author}`, kapsam, engelleyen: `<@${engel.engelleyen}>` }));
+      const m = await message.reply({ embeds: [e], allowedMentions: { repliedUser: false } }).catch(() => null);
+      setTimeout(() => { try { m?.delete().catch(() => {}); } catch {} }, 20000);
+      return;
+    }
+  }
+
+  // Iki dilli komut cozumleme (TR ad/alias + EN ad/alias)
+  let canonical = komutCoz(client, command);
+
+  // Fuzzy matching: yanlis yazilmis komut icin onerme
+  // (kullanicinin dilinde: EN ise Ingilizce ad, TR ise Turkce ad gosterilir;
+  //  bulunamayan metin her zaman cevaba eklenir: "cant find X" / "X diye komut yok")
+  if (!canonical) {
+    const lang = await getLang(message.author.id);
+    const { KOMUTLAR } = require("../dil/komutlar");
+    // "r!create server" gibi bosluklu yazimlarda ilk parametre de komutun parcasi olabilir
+    const fullTyped = parts.slice(0, 2).join(" ").slice(prefix.length).trim().slice(0, 60) || command;
+    const dashed = params.length ? `${command}-${params[0]}`.toLowerCase() : null;
+    const spaced = params.length ? `${command} ${params[0]}`.toLowerCase() : null;
+    let suggestion = findClosestCommand(command, client, 55);
+    if (!suggestion && dashed) {
+      suggestion = findClosestCommand(dashed, client, 55)
+        || (spaced ? findClosestCommand(spaced, client, 55) : null);
+    }
+    const displayOf = (canon) => {
+      const cmd = client.commands.get(canon);
+      if (lang === "en") return (KOMUTLAR[canon]?.en || cmd?.help?.name || canon);
+      return (cmd?.help?.name || canon);
+    };
+    if (suggestion) {
+      const displayName = displayOf(suggestion.canonical);
+      const suggestionMsg = lang === "en"
+        ? `❌ Can't find \`r!${fullTyped}\`. Did you mean \`r!${displayName}\`?`
+        : `❌ \`r!${fullTyped}\` diye bir komut yok. \`r!${displayName}\` mu demek istediniz?`;
+      return message.reply({ content: suggestionMsg, allowedMentions: { repliedUser: false } }).catch(() => {});
+    }
+    // Hic benzer komut yoksa sessiz kalma — bulunamayan komutu dille bildir
+    const notFoundMsg = lang === "en"
+      ? `❌ Can't find \`r!${fullTyped}\`. Type \`${prefix}help\` for the command list.`
+      : `❌ \`r!${fullTyped}\` diye bir komut yok. Komutlar için \`${prefix}yardım\` yaz.`;
+    return message.reply({ content: notFoundMsg, allowedMentions: { repliedUser: false } }).catch(() => {});
+  }
+  const cmd = client.commands.get(canonical);
+  if (!cmd) return;
+
+  // Dil secmemis kullanici veya sunucu dili secmemis sunucu sahibi (dil komutu haric)
+  // SAHİP BYPASS: bot sahibi bakım/mağaza gibi acil komutları dil seçmeden çalıştırır
+  const sahipBypass = message.author.id === SAHIP_ID;
+  const isOwner = Boolean(message.guild && message.guild.ownerId === message.author.id);
+  const userNeedsLang = !hasLang(message.author.id);
+  const guildNeedsLang = isOwner && !hasGuildLang(message.guild.id);
+
+  // 1. ÖNCE DİL SEÇİMİ - dil seçilmemişse dil paneli göster (onay butonları YOK)
+  if (canonical !== "dil" && !sahipBypass && (userNeedsLang || guildNeedsLang)) {
+    try {
+      const { dilPaneli } = require("../komutlar/dil");
+      return await message.reply(dilPaneli(prefix, { isOwner, userNeedsLang, guildNeedsLang })).catch(() => {});
+    } catch {
+      return message.reply(`🌍 Önce dilini seç / Select your language: \`${prefix}dil tr\` / \`${prefix}dil en\``).catch(() => {});
+    }
+  }
+
+  // 2. SONRA ONAY - dil seçilmişse ama onay verilmemişse onay paneli göster (dil seçili, onay butonları VAR)
+  if (canonical !== "dil" && canonical !== "yardım" && !sahipBypass) {
+    if (!hasConsent(message.author.id)) {
+      const ulang = await getLang(message.author.id);
+      try {
+        const { dilPaneli } = require("../komutlar/dil");
+        // userNeedsLang: false çünkü dil zaten seçili
+        await message.reply(dilPaneli(prefix, { isOwner, userNeedsLang: false, guildNeedsLang })).catch(() => {});
+      } catch {}
+      return message.reply(t(ulang, "onay.gerekli")).catch(() => {});
+    }
+  }
+
+  const lang = await getLang(message.author.id);
+
+  // Bakım modu (sahip hariç)
+  if (message.author.id !== SAHIP_ID) {
+    const bakim = bakimSebebi();
+    if (bakim && cmd.help.name !== "bakım") {
+      return message.reply(t(lang, "ortak.bakimda", { sebep: bakim })).catch(() => {});
+    }
+  }
+
+  // Karaliste (dil dosyasından, inline EN yok)
+  const karaliste = db.fetch(`karalist_${message.author.id}`);
+  if (karaliste === "aktif" || karaliste === true) {
+    const sebep = db.fetch(`sebep_${message.author.id}`) || "-";
+    const e = new EmbedBuilder()
+      .setColor("#36393F")
+      .setTitle("⛔")
+      .setDescription(t(lang, "karaliste.engellisin", { sebep }))
+      .setImage("https://img.artigercek.com/uploads/1/0/7pOJ1lYcS2P0bKjoHMFpFC4xAT7bD3JnNSmjY4wJ.jpeg")
+      .setThumbnail(client.user.displayAvatarURL());
+    await ownerLog(client, new EmbedBuilder().setColor("Blue").setTimestamp().setFooter({ text: "RiseBunny" })
+      .setDescription(`**${message.author.tag}** karalistede olup **${command}** komutunu **${message.guild.name}** sunucusunda denedi.`));
+    return message.channel.send({ embeds: [e] }).catch(() => {});
+  }
+
+  if (cmd.conf.enabled === false && message.author.id !== SAHIP_ID) {
+    return message.channel.send({ embeds: [new EmbedBuilder().setDescription(`**${cmd.help.name}** şu anda kapalı!`).setColor("Red")] }).catch(() => {});
+  }
+
+  const yetkiHata = (metin) => message.channel.send({ embeds: [new EmbedBuilder().setDescription(metin).setColor("Red")] }).catch(() => {});
+  if (cmd.conf.permLevel === 1 && !message.member.permissions.has(PermissionFlagsBits.ManageMessages))
+    return yetkiHata(t(lang, "ortak.yetki", { yetki: "Mesajları Yönet" }));
+  if (cmd.conf.permLevel === 2 && !message.member.permissions.has(PermissionFlagsBits.KickMembers))
+    return yetkiHata(t(lang, "ortak.yetki", { yetki: "Üyeleri At" }));
+  if (cmd.conf.permLevel === 3 && !message.member.permissions.has(PermissionFlagsBits.BanMembers))
+    return yetkiHata(t(lang, "ortak.yetki", { yetki: "Üyeleri Yasakla" }));
+  if (cmd.conf.permLevel === 4 && !message.member.permissions.has(PermissionFlagsBits.Administrator))
+    return yetkiHata(t(lang, "ortak.yetki", { yetki: "Yönetici" }));
+  if (cmd.conf.permLevel === 5 && message.author.id !== SAHIP_ID) {
+    // Mod muafiyeti: karaliste/beyazliste/kupon/bakım modlara açık
+    try {
+      const { modMuafKomut, isMod } = require("../ai/executor");
+      if (!(modMuafKomut(cmd.help.name) && isMod(message.author.id)))
+        return yetkiHata(t(lang, "ortak.sahipSadece"));
+    } catch {
+      return yetkiHata(t(lang, "ortak.sahipSadece"));
+    }
+  }
+
+  /* Buraya takılan komut eskiden hiçbir cevap vermeden susuyordu
+     (sahip bile r!presil çalıştıramıyordu). Artık sebep bildirilir.
+     Mod muafiyeti: karaliste/beyazliste/kupon/bakım için modlarda perms bakılmaz. */
+  let modMuaf = false;
+  try {
+    const { modMuafKomut, isMod } = require("../ai/executor");
+    modMuaf = modMuafKomut(cmd.help.name) && isMod(message.author.id);
+  } catch {}
+  if (!modMuaf && perms < cmd.conf.permLevel) return yetkiHata(t(lang, "ortak.yetki", { yetki: "Daha yüksek yetki" }));
+
+  try {
+    await cmd.run(client, message, params, perms);
+    // Komut başarıyla çalıştıysa XP ver
+    if (cmd.conf.enabled !== false) {
+      try { await giveCommandXp(client, message.author.id, message.guild.id); } catch {}
+    }
+  } catch (error) {
+    /* Kaydı dosya + satır + hata koduyla yap: sadece error.message yetmiyordu. */
+    const kare = String(error?.stack || "").split("\n").map(l => l.trim());
+    const kaynak = kare.find(l => l.includes("komutlar/")) || kare[1] || "?";
+    const dosya = (cmd.__dosya || `${cmd.help.name}.js`);
+    console.error(`[KOMUT HATASI] ${dosya} | ${error?.name || "Error"}: ${error?.message || error}` +
+      (error?.code != null ? ` (kod: ${error.code})` : "") + `\n  → ${kaynak}`);
+    console.error(kare.slice(0, 6).join("\n"));
+    try {
+      await message.channel.send(`${t(lang, "ortak.hata")}\n\`${cmd.help.name}\` — ${lang === "en" ? "the reason was sent to the owner" : "sebep sahibe iletildi"}`);
+    } catch {}
+    try {
+      const detay = [
+        `**Komut:** \`${cmd.help.name}\` (\`${dosya}\`)`,
+        `**Yazılan:** \`${String(message.content).slice(0, 200)}\``,
+        `**Hata:** \`${error?.name || "Error"}: ${String(error?.message || error).slice(0, 300)}\`${error?.code != null ? ` (kod: \`${error.code}\`)` : ""}`,
+        `**Kaynak:** \`${kaynak.slice(0, 200)}\``,
+        `**Sunucu:** ${message.guild?.name || "-"} · **Kanal:** <#${message.channel?.id}> · **Yetkili:** <@${message.author.id}>`,
+        "```" + kare.slice(0, 8).join("\n").slice(0, 1000) + "```",
+      ].join("\n");
+      await ownerLog(client, new EmbedBuilder().setColor("Red").setTitle("Komut Hatası").setDescription(detay.slice(0, 4000)));
+    } catch {}
+  }
+};
