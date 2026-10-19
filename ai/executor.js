@@ -488,6 +488,157 @@ function toolPrompt(lang) {
     : `Bir Discord botu için komut ayrıştırıcısın. Aşağıdaki kullanıcı isteğine SADECE JSON objesiyle cevap ver, başka metin yazma.\nHIZLI araçlar (uyuyorsa bunları tercih et):\n${hizli}\n\nDİĞER tüm komutlar (katalogdan "komut" seç, tr veya en adıyla):\n${katalog}\n\nFormat A (hızlı): {"tool":"<hizli-ad>","params":{"kullanici":"...","sebep":"...","sure":"10m","adet":10,"rol":"...","durum":"aç/kapat"}}\nFormat B (katalogdaki herhangi bir komut): {"tool":"komut_calistir","komut":"<katalog adı>","args":"<kullanıcının yazacağı argümanlar>","hedef":"<kullanıcı>","rol":"<rol>","kanal":"<kanal>"}\nÖrnek B: ${ornek}\nKurallar: istek eylem DEĞİLSE (soru/sohbet) {"tool":"none"} dön. Sahip komutları (eval, bakım, veri, yedek, kupon, karaliste, siterol, unbanall) YOK — asla seçme. YIKICI kurulum (sunucukur/setup-server/setup) komut_calistir ile ASLA seçilmez — yerine {"tool":"sunucu_kur","params":{}} dön. Kullanıcı adlarını/etikeleri aynen kullanici/hedef'e yaz. "7 gün/10dk/1h" gibi süreleri sure veya args'e yaz.`;
 }
 
+/* ── Komutun GERÇEK izin seviyesi denetimi ─────────────────────
+   Komut dosyasına yönlendirmede AI, komutun kendi yetki kontrolüne
+   güvenmek zorunda değil: burada komutun `permLevel`/`help.kategori`
+   bilgisi ve komut dosyasının kendi `exports.conf` alanları okunur.
+   Böylece AI, yetkisi olmayan bir komutu asla çalıştırmaz. */
+const PERM_ADLARI = {
+  0: null,
+  1: ["ManageMessages"],
+  2: ["KickMembers", "ManageMessages"],
+  3: ["BanMembers", "KickMembers", "ManageMessages"],
+  4: ["Administrator"],
+  5: ["Administrator"],
+};
+
+/* Komut kodunun içinde geçen Discord izni → gereken izin eşlemesi.
+   permLevel alanı yanlış/düşük yazılmış olsa bile (ör. ban.js permLevel:0 ama
+   içinde BanMembers kontrolü var) gerçek izin koddan okunur. */
+const KOD_IZIN_DESENI = [
+  { bit: PermissionFlagsBits.BanMembers,      anahtar: "BanMembers" },
+  { bit: PermissionFlagsBits.KickMembers,     anahtar: "KickMembers" },
+  { bit: PermissionFlagsBits.Administrator,   anahtar: "Administrator" },
+  { bit: PermissionFlagsBits.ManageGuild,     anahtar: "ManageGuild" },
+  { bit: PermissionFlagsBits.ManageRoles,     anahtar: "ManageRoles" },
+  { bit: PermissionFlagsBits.ManageChannels,  anahtar: "ManageChannels" },
+  { bit: PermissionFlagsBits.ManageMessages,  anahtar: "ManageMessages" },
+  { bit: PermissionFlagsBits.ModerateMembers, anahtar: "ModerateMembers" },
+];
+
+/** Komut dosyasının kaynak kodunda geçen izin bitlerini bulur (önbellekli). */
+const _kaynakCache = new Map();
+function komutKaynakIzni(canonical) {
+  if (_kaynakCache.has(canonical)) return _kaynakCache.get(canonical);
+  let sonuc = { bitler: 0n, varMi: false };
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    const yol = path.join(__dirname, "..", "komutlar", `${canonical}.js`);
+    if (fs.existsSync(yol)) {
+      const kod = fs.readFileSync(yol, "utf8");
+      let bitler = 0n;
+      for (const d of KOD_IZIN_DESENI) {
+        if (kod.includes(`PermissionFlagsBits.${d.anahtar}`)) bitler |= d.bit;
+      }
+      sonuc = { bitler, varMi: kod.includes("PermissionFlagsBits") };
+    }
+  } catch {}
+  _kaynakCache.set(canonical, sonuc);
+  return sonuc;
+}
+
+function permAdi(seviye, lang) {
+  const adlar = PERM_ADLARI[Number(seviye) || 0];
+  if (!adlar) return null;
+  const TR = {
+    ManageMessages: "Mesajları Yönet",
+    KickMembers: "Üyeleri At",
+    BanMembers: "Üyeleri Yasakla",
+    Administrator: "Yönetici",
+  };
+  const EN = {
+    ManageMessages: "Manage Messages",
+    KickMembers: "Kick Members",
+    BanMembers: "Ban Members",
+    Administrator: "Administrator",
+  };
+  const map = lang === "en" ? EN : TR;
+  return adlar.map(a => map[a] || a).join(" / ");
+}
+
+/**
+ * Komutun gerektirdiği minimum Discord iznini döndürür.
+ * @returns {{ ad: string|null, seviye: number, sahip: boolean }}
+ */
+function komutYetkisi(canonical, lang = "tr") {
+  const bilgi = KOMUTLAR[canonical] || {};
+  const cmd = (() => {
+    try { return require(`../komutlar/${canonical}`); } catch { return null; }
+  })();
+  const confLevel = Number(cmd?.conf?.permLevel ?? bilgi.permLevel ?? 0);
+  const kat = cmd?.conf?.kategori || cmd?.help?.kategori || bilgi.kat || "genel";
+  const sahip = kat === "sahip" || confLevel >= 5;
+
+  // Kod içindeki gerçek izin bitleri (permLevel yanlışsa kurtarır)
+  const kaynak = komutKaynakIzni(canonical);
+  const adSet = new Set();
+  if (kaynak.varMi) {
+    for (const d of KOD_IZIN_DESENI) {
+      if (kaynak.bitler & d.bit) adSet.add(d.anahtar);
+    }
+  }
+  // permLevel'ın söylediği izinleri de ekle (kod kontrolü olmayan komutlar için)
+  for (const a of (PERM_ADLARI[confLevel] || [])) adSet.add(a);
+
+  return {
+    ad: [...adSet].map(a => PERM_ADLARI_ADI(lang)[a] || a).join(" / ") || null,
+    izinler: [...adSet],
+    kodIzni: kaynak.varMi,
+    seviye: confLevel,
+    sahip,
+    kategori: kat,
+  };
+}
+
+function PERM_ADLARI_ADI(lang) {
+  const TR = {
+    ManageMessages: "Mesajları Yönet",
+    KickMembers: "Üyeleri At",
+    BanMembers: "Üyeleri Yasakla",
+    Administrator: "Yönetici",
+    ManageGuild: "Sunucuyu Yönet",
+    ManageRoles: "Rolleri Yönet",
+    ManageChannels: "Kanalları Yönet",
+    ModerateMembers: "Üyeleri Sustur",
+  };
+  const EN = {
+    ManageMessages: "Manage Messages",
+    KickMembers: "Kick Members",
+    BanMembers: "Ban Members",
+    Administrator: "Administrator",
+    ManageGuild: "Manage Server",
+    ManageRoles: "Manage Roles",
+    ManageChannels: "Manage Channels",
+    ModerateMembers: "Timeout Members",
+  };
+  return lang === "en" ? EN : TR;
+}
+
+/**
+ * Kullanıcının bu komutu çalıştırmaya yetkisi var mı?
+ * @returns {{ ok: boolean, gerekli: string|null, sebep?: string }}
+ */
+function yetkiDenetle(message, canonical, lang = "tr") {
+  const y = komutYetkisi(canonical, lang);
+  if (y.sahip) return { ok: false, gerekli: null, sebep: "sahip" };
+  const member = message.member;
+  if (!member) return { ok: false, gerekli: null, sebep: "uyedegil" };
+
+  // Yönetici her şeyi yapar
+  if (member.permissions.has(PermissionFlagsBits.Administrator)) return { ok: true, gerekli: y.ad };
+
+  // Komutun gerçek izin listesi
+  const gerekli = y.izinler.length ? y.izinler : (y.seviye === 0 ? [] : []);
+  for (const ad of gerekli) {
+    const bit = PermissionFlagsBits[ad];
+    if (bit && !member.permissions.has(bit)) {
+      return { ok: false, gerekli: PERM_ADLARI_ADI(lang)[ad] || ad, sebep: "yetki" };
+    }
+  }
+  return { ok: true, gerekli: y.ad };
+}
+
 function jsonCikar(metin) {
   if (!metin) return null;
   const m = String(metin).match(/\{[\s\S]*\}/);
@@ -555,10 +706,14 @@ async function aiKomutCalistir(client, message, soru) {
   if (!message.guild) return { eleAlindi: false };
 
   // 1) Beta-tester kapısı (sahip her zaman geçer)
+  //    NOT: Kapı kapalıyken AI'ya komut kataloğu HİÇ gönderilmez —
+  //    böylece model "beta tester" gibi bir kelime uydurup kullanıcıya hata vermez.
   if (!isBetaTester(message.author.id)) {
     return {
       eleAlindi: true,
-      cevap: EN ? "❌ I can't do that yet — AI commands are in **beta**. 🐰" : "❌ Bunu henüz yapamam — AI komutları **beta** testinde. 🐰",
+      cevap: EN
+        ? "🧪 **AI commands are in closed beta right now.**\nAsk the server owner to add you to the beta list, then try again. Meanwhile you can run commands normally (e.g. `r!help`) or ask me questions with `rise <question>` 🐰"
+        : "🧪 **AI ile komut çalıştırma şu an kapalı beta aşamasında.**\nSunucu sahibinden beta listesine eklenmeni isteyip tekrar dene. Bu arada komutları normal şekilde kullanabilir (`r!yardım`) ya da bana `rise <soru>` ile soru sorabilirsin 🐰",
     };
   }
   // 2) Premium kapısı (sahip + mod muaf)
@@ -587,8 +742,27 @@ async function aiKomutCalistir(client, message, soru) {
   if (!secim || !secim.tool || secim.tool === "none") return { eleAlindi: false };
 
   // 3b) Genel katalog komutu → ilgili komut dosyasına yönlendir
-  // (yetki kontrolleri komutun kendisinde çalışır)
-  if (secim.tool === "komut_calistir") return komutYonlendir(client, message, secim);
+  // (komutun KENDİ yetki kontrolü + burada yapılan permLevel denetimi birlikte çalışır)
+  if (secim.tool === "komut_calistir") {
+    const canonical = komutCoz(client, secim.komut || "");
+    if (canonical && !aiBlokluMu(canonical)) {
+      const yetki = yetkiDenetle(message, canonical, lang);
+      if (!yetki.ok) {
+        if (yetki.sebep === "sahip") {
+          return { eleAlindi: true, cevap: EN ? "❌ I can't run that command." : "❌ Bu komutu çalıştıramam." };
+        }
+        await retLog(client, {
+          guild: message.guild, yazar: message.author,
+          islem: `komut_calistir:${canonical}`, eksik: yetki.gerekli || "yetki",
+        });
+        return {
+          eleAlindi: true,
+          cevap: dogalCevap(lang, { ok: false, kod: "yetkiyok", gerekli: yetki.gerekli || "?" }),
+        };
+      }
+    }
+    return komutYonlendir(client, message, secim);
+  }
 
   if (SAHIP_KOMUTLARI.has(String(secim.tool).toLowerCase()))
     return { eleAlindi: true, cevap: EN ? "❌ I can't run that command." : "❌ Bu komutu çalıştıramam." };
@@ -626,6 +800,7 @@ async function aiKomutCalistir(client, message, soru) {
 
 module.exports = {
   aiKomutCalistir, isAction, hedefCoz, rolCoz, kanalCoz, komutYonlendir, komutKatalogu,
+  komutYetkisi, yetkiDenetle, permAdi,
   isBetaTester, betaEkle, betaCikar, betaListesi,
   isMod, modEkle, modCikar, modListesi, modYetkiliMi, modMuafKomut,
   SAHIP_KOMUTLARI, AI_BLOKLISTE, aiBlokluMu, IKINCI_YETKILI, MAX_ITER,

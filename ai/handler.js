@@ -445,12 +445,24 @@ async function aiIsle(message, client) {
   }
 
   // Dil + onay kilidi (sahip muaf): dili yoksa dil paneline, onayı yoksa r!dil'e yönlendir
+  // NOT: Kullanıcı dil seçmemişse mesajın dili algılanır; desteklenen dildeyse
+  // o dilde cevap verilir (varsayılan EN). Onaysız kullanıcı botu kullanamaz.
+  const { dilAlgila, anlamiyorumMesaji } = require("./lang");
   if (message.author.id !== SAHIP_ID) {
     const { t } = require("../dil");
     if (!hasLang(message.author.id)) {
       const prefix = process.env.PREFIX || "r!";
+      const alg0 = dilAlgila(soru || icerik);
+      if (alg0.destekli === false && alg0.kod) {
+        // Dilini anlamıyoruz: yalan/uydurma cevap yok, açıkça söyle
+        await message.reply({ content: anlamiyorumMesaji(alg0), allowedMentions: { repliedUser: false } }).catch(() => {});
+        return true;
+      }
+      const EN0 = (alg0.dil || "en") === "en";
       await message.reply({
-        content: `🌍 Önce dilini seç / Select your language: \`${prefix}dil tr\` / \`${prefix}dil en\``,
+        content: EN0
+          ? `🌍 Pick your language first: \`${prefix}dil en\` / \`${prefix}dil tr\``
+          : `🌍 Önce dilini seç: \`${prefix}dil tr\` / \`${prefix}dil en\``,
         allowedMentions: { repliedUser: false },
       }).catch(() => {});
       return true;
@@ -553,10 +565,22 @@ async function aiIsle(message, client) {
   }
 
   // 1) Global local bilgi tabanı (cevaplar.json + ai_qa_)
+  //    Cevap, kullanıcının diline göre seçilir: cevap_en varsa ve dil EN ise o verilir.
   const sonuc = await matcher.bul(soru);
+  const { cevapDili, dilAlgila: dilAlgilaLocal, anlamiyorumMesaji: anlamiyorumLocal } = require("./lang");
+
+  // Desteklenmeyen dilde yazıldıysa yerel eşleştirici de cevap uydurmasın
+  const algYerel = dilAlgilaLocal(soru);
+  if (!sonuc && algYerel.destekli === false && algYerel.kod && algYerel.guven >= 0.9) {
+    await message.reply({ content: anlamiyorumLocal(algYerel), allowedMentions: { repliedUser: false } }).catch(() => {});
+    return true;
+  }
 
   if (sonuc) {
-    await yerelCevapGonder(message, client, matcher.degiskenleriDoldur ? matcher.degiskenleriDoldur(sonuc.cevap, message, client) : sonuc.cevap, "");
+    const sec = hasLang(message.author.id) ? getLangSync(message.author.id) : null;
+    const hedefDil = cevapDili(sec, soru).dil;
+    const hamCevap = hedefDil === "en" && sonuc.cevap_en ? sonuc.cevap_en : sonuc.cevap;
+    await yerelCevapGonder(message, client, matcher.degiskenleriDoldur ? matcher.degiskenleriDoldur(hamCevap, message, client) : hamCevap, "");
     try { db.add(`ai_qa_${sonuc.id}_kullanim`, 1); } catch {}
     console.log(`🤖 [AI Local] ${message.author.tag}: "${soru}" → "${sonuc.soru}" (skor: ${sonuc.skor.toFixed(2)})`);
     return true;
@@ -596,7 +620,17 @@ async function aiIsle(message, client) {
 
   const { chainAsk } = require("./providers");
   const { buildSystemPrompt } = require("./groq");
-  const lang = getLangSync(message.author.id);
+
+  // Desteklenmeyen dilde yazıldıysa uydurma cevap verme — açıkça söyle
+  const alg = dilAlgila(soru);
+  if (alg.destekli === false && alg.kod && ["ru", "ar", "fa", "el", "he", "zh", "ja", "ko", "hi", "th", "ka", "hy"].includes(alg.kod)) {
+    await message.reply({ content: anlamiyorumMesaji(alg), allowedMentions: { repliedUser: false } }).catch(() => {});
+    return true;
+  }
+
+  // Cevap dili: kullanıcı seçimi → mesajın dili (algılandı) → varsayılan EN
+  const secili = hasLang(message.author.id) ? getLangSync(message.author.id) : null;
+  const lang = secili === "tr" || secili === "en" ? secili : (alg.dil || "en");
   const groqSonuc = await chainAsk(buildSystemPrompt(egitimVerileriniHazirla(message.guild?.id), lang), soru, lang);
 
   if (groqSonuc.success) {

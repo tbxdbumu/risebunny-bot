@@ -901,10 +901,14 @@
         "get vape free",
         "vape for free",
         "free vape",
-        "vape ücretsiz mi gerçekten"
+        "vape ücretsiz mi gerçekten",
+        "vape cosmetik modu nasıl açılır",
+        "vape v4 ücretsiz nasıl alınır",
+        "vape launcher nasıl kullanılır",
+        "vape ücretsiz kurulum"
       ],
-      "cevap": "Vape V4 / V4.22'yi kullanmak için **RiseBunny Premium** alman yeterli! 💎 Premium ile tüm Vape avantajlarına erişirsin.\n• Premium al: `{{prefix}}premium-al` (oyun parasıyla) ya da site üzerinden: https://risebunny.vercel.app\n• Takıldığın yerde Discord'umuza gel, birlikte kuralım: https://discord.gg/mEfz5SfpbR 🐰\n\nTo use Vape V4 / V4.22 just get **RiseBunny Premium**! 💎 It unlocks every Vape perk.\n• Get premium: `{{prefix}}buy-premium` (game money) or the site: https://risebunny.vercel.app\n• Need help? Join our Discord and we'll set it up together: https://discord.gg/mEfz5SfpbR 🐰",
-      "cevap_en": "To use Vape V4 / V4.22 just get **RiseBunny Premium**! 💎 It unlocks every Vape perk.\n• Get premium: `{{prefix}}buy-premium` (game money) or the site: https://risebunny.vercel.app\n• Need help? Join our Discord and we'll set it up together: https://discord.gg/mEfz5SfpbR 🐰"
+      "cevap": "🎮 **Vape V4 / V4.22 ücretsiz!** RiseBunny Launcher üzerinden kurulur:\n• Launcher: https://risebunny.vercel.app/risebunny\n• İndirme linki: https://dsc.gg/risebunny\n• Vape V4 · V4.22 ve Lunar Client **Cosmetik modu** launcher ile ücretsiz açılır 💎\n• Kurulumda yardım: https://discord.gg/mEfz5SfpbR 🐰",
+      "cevap_en": "🎮 **Vape V4 / V4.22 ücretsiz!** RiseBunny Launcher üzerinden kurulur:\n• Launcher: https://risebunny.vercel.app/risebunny\n• İndirme linki: https://dsc.gg/risebunny\n• Vape V4 · V4.22 ve Lunar Client **Cosmetik modu** launcher ile ücretsiz açılır 💎\n• Kurulumda yardım: https://discord.gg/mEfz5SfpbR 🐰"
     },
     {
       "kategori": "vape",
@@ -1039,10 +1043,13 @@
         "rubidium",
         "rubidium v4",
         "where to download rubidium",
-        "rubidium nereden indirilir"
+        "rubidium nereden indirilir",
+        "rubidium launcher",
+        "rubidium hangi launcher",
+        "rubidium nereden indirilir 2026"
       ],
-      "cevap": "Rubidium V4 için: https://dsc.gg/risebunny 🐰\n\nFor Rubidium V4: https://dsc.gg/risebunny 🐰",
-      "cevap_en": "For Rubidium V4: https://dsc.gg/risebunny 🐰"
+      "cevap": "🐰 **Rubidium V4** — RiseBunny Launcher üzerinden ücretsiz kurulur:\n• Launcher: https://risebunny.vercel.app/risebunny\n• İndirme / destek: https://dsc.gg/risebunny\n• Destek sunucu: https://discord.gg/mEfz5SfpbR\nLauncher'da Discord ile giriş yap → Rubidium V4 → Kur.",
+      "cevap_en": "🐰 **Rubidium V4** — RiseBunny Launcher üzerinden ücretsiz kurulur:\n• Launcher: https://risebunny.vercel.app/risebunny\n• İndirme / destek: https://dsc.gg/risebunny\n• Destek sunucu: https://discord.gg/mEfz5SfpbR\nLauncher'da Discord ile giriş yap → Rubidium V4 → Kur."
     },
     {
       "kategori": "genel",
@@ -2533,6 +2540,96 @@
       ],
       "cevap": "🤖 `rise <soru>` doğal dille soru sormak içindir. `{{prefix}}yardım`, `{{prefix}}ping` veya `{{prefix}}günlük` gibi komutlar ise botun belirli işlemlerini çalıştırır. Bir ayarı değiştirmek ya da oyun içi işlem yapmak için ilgili komutun ve Discord izinlerinin uygun olması gerekir.",
       "cevap_en": "🤖 Use `rise <question>` to ask in natural language. Commands such as `{{prefix}}help`, `{{prefix}}ping`, or `{{prefix}}daily` perform specific bot actions. Changing settings or carrying out in-game actions still requires supported commands and the appropriate Discord permissions."
+    },
+    {
+      "kategori": "hile",
+      "sorular": [
+        "en iyi hile nedir",
+        "en iyi hile hangisi",
+        "en iyi hile ne",
+        "hile ne kullanmalıyım",
+        "hangi hileyi kullanayım",
+        "hangi client en iyi",
+        "best cheat",
+        "best client",
+        "en iyi client",
+        "en iyi client hangisi",
+        "en iyi minecraft hilesi",
+        "hile önerisi",
+        "hile tavsiye",
+        "hangi hile daha iyi",
+        "en iyi hile 2026",
+        "en iyi hile 2025",
+        "mcg hile",
+        "mcg",
+        "client önerisi",
+        "client tavsiyesi"
+      ],
+      "cevap": "🏆 **En iyi hile: Rubidium V4** 🐰\nRubidium V4'ü **RiseBunny Launcher** üzerinden indirip tek tıkla kurabilirsin.\n• Launcher: https://risebunny.vercel.app/risebunny\n• İndirme / destek: https://dsc.gg/risebunny\n• Vape V4 / V4.22 ve Lunar Client **Cosmetik (Cosmetics) modu** RiseBunny Launcher üzerinden **ücretsiz** açılır 💎\nKurulumda takılırsan destek sunucumuz: https://discord.gg/mEfz5SfpbR",
+      "cevap_en": "🏆 **En iyi hile: Rubidium V4** 🐰\nRubidium V4'ü **RiseBunny Launcher** üzerinden indirip tek tıkla kurabilirsin.\n• Launcher: https://risebunny.vercel.app/risebunny\n• İndirme / destek: https://dsc.gg/risebunny\n• Vape V4 / V4.22 ve Lunar Client **Cosmetik (Cosmetics) modu** RiseBunny Launcher üzerinden **ücretsiz** açılır 💎\nKurulumda takılırsan destek sunucumuz: https://discord.gg/mEfz5SfpbR"
+    },
+    {
+      "kategori": "hile",
+      "sorular": [
+        "hangi hileler ücretsiz",
+        "hile ücretsiz mi",
+        "ücretsiz hile var mı",
+        "bedava hile",
+        "hile nasıl kurulur",
+        "hile nasıl indirilir",
+        "hile indirme linki",
+        "hile indir",
+        "hileyi nereden indirebilirim",
+        "cheat download",
+        "free cheat",
+        "hile kurulumu",
+        "rubidium nasıl kurulur",
+        "rubidium kurulum",
+        "rubidium launcher nasıl kullanılır",
+        "hile kullanmak yasak mı",
+        "hile ban yer miyim",
+        "hile güvenli mi"
+      ],
+      "cevap": "📥 **Hile kurulumu (hepsi RiseBunny Launcher ile):**\n1. Launcher'ı indir: https://risebunny.vercel.app/risebunny\n2. Discord ile giriş yap.\n3. Rubidium V4 / Vape / Lunar Client seç ve **Kur**'a bas.\n4. Vape V4 · V4.22 ve Lunar **Cosmetik modu** launcher üzerinden ücretsiz açılır ✅\nYardım: https://dsc.gg/risebunny • Destek sunucu: https://discord.gg/mEfz5SfpbR\nNot: sunucu kurallarına ve kullandığın sunucunun anti-cheat'ine dikkat et.",
+      "cevap_en": "📥 **Hile kurulumu (hepsi RiseBunny Launcher ile):**\n1. Launcher'ı indir: https://risebunny.vercel.app/risebunny\n2. Discord ile giriş yap.\n3. Rubidium V4 / Vape / Lunar Client seç ve **Kur**'a bas.\n4. Vape V4 · V4.22 ve Lunar **Cosmetik modu** launcher üzerinden ücretsiz açılır ✅\nYardım: https://dsc.gg/risebunny • Destek sunucu: https://discord.gg/mEfz5SfpbR\nNot: sunucu kurallarına ve kullandığın sunucunun anti-cheat'ine dikkat et."
+    },
+    {
+      "kategori": "vape",
+      "sorular": [
+        "vape v4 ücretsiz nasıl alırım",
+        "vape v4 ücretsiz kurulum",
+        "vape cosmetik modu",
+        "vape cosmetics",
+        "vape cosmetik ücretsiz",
+        "vape kozmetik modu nasıl açılır",
+        "lunar client cosmetik",
+        "lunar cosmetics ücretsiz",
+        "lunar client ücretsiz",
+        "lunar client cosmetik modu",
+        "lunar client premium ücretsiz",
+        "lunar client nasıl ücretsiz kullanılır",
+        "lunar client crack",
+        "lunar free"
+      ],
+      "cevap": "💎 **Vape V4 / V4.22 ve Lunar Client Cosmetik modu RiseBunny Launcher ile ÜCRETSİZ!**\n• Launcher: https://risebunny.vercel.app/risebunny\n• İndirme: https://dsc.gg/risebunny\n• Destek / kurulum yardımı: https://discord.gg/mEfz5SfpbR 🐰\nLauncher'da Discord ile giriş yap, ilgili client'ı seç, Cosmetik modunu işaretle ve kur.",
+      "cevap_en": "💎 **Vape V4 / V4.22 ve Lunar Client Cosmetik modu RiseBunny Launcher ile ÜCRETSİZ!**\n• Launcher: https://risebunny.vercel.app/risebunny\n• İndirme: https://dsc.gg/risebunny\n• Destek / kurulum yardımı: https://discord.gg/mEfz5SfpbR 🐰\nLauncher'da Discord ile giriş yap, ilgili client'ı seç, Cosmetik modunu işaretle ve kur."
+    },
+    {
+      "kategori": "hile",
+      "sorular": [
+        "rubidium vs vape",
+        "vape mi rubidium mu",
+        "hangi hile daha iyi rubidium vape",
+        "hile karşılaştırma",
+        "rubidium nedir hile",
+        "hile fiyatları",
+        "hile ne kadar",
+        "rubidium ücretsiz mi",
+        "rubidium premium mu",
+        "hile satın alma"
+      ],
+      "cevap": "⚔️ **Rubidium V4 vs Vape:**\n• **Rubidium V4** — ücretsiz, hafif ve stabil; RiseBunny Launcher ile tek tıkla kurulur. ✅\n• **Vape V4 / V4.22** — modül ve config havuzu geniş; launcher üzerinden ücretsiz erişilebilir.\n• **Lunar Client Cosmetik modu** — launcher ile ücretsiz açılır.\nLauncher: https://risebunny.vercel.app/risebunny • İndirme/destek: https://dsc.gg/risebunny",
+      "cevap_en": "⚔️ **Rubidium V4 vs Vape:**\n• **Rubidium V4** — ücretsiz, hafif ve stabil; RiseBunny Launcher ile tek tıkla kurulur. ✅\n• **Vape V4 / V4.22** — modül ve config havuzu geniş; launcher üzerinden ücretsiz erişilebilir.\n• **Lunar Client Cosmetik modu** — launcher ile ücretsiz açılır.\nLauncher: https://risebunny.vercel.app/risebunny • İndirme/destek: https://dsc.gg/risebunny"
     }
   ]
 }

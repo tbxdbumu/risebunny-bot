@@ -138,7 +138,7 @@ const client = new Discord.Client({
     Discord.GatewayIntentBits.GuildModeration,
     Discord.GatewayIntentBits.DirectMessages
   ],
-  partials: [Discord.Partials.Channel, Discord.Partials.Message, Discord.Partials.Reaction],
+  partials: [Discord.Partials.Channel, Discord.Partials.Message, Discord.Partials.Reaction, Discord.Partials.GuildMember, Discord.Partials.User],
   allowedMentions: { parse: ["users", "roles"], repliedUser: true }
 });
 for (const _m of ["once", "on"]) {
@@ -246,16 +246,19 @@ function _botAuth(req, res, next) {
    istemci `Authorization: Bearer …` ile gönderir, site proxy'si yalnızca
    /api/public/* için iletir. Bot AYNI sırla doğrular (TICKET_SECRET veya
    SESSION_SECRET — Vercel'dekiyle birebir aynı değeri buraya da girin).
-   Sır tanımlı değilse eski davranış sürer (kurulum öncesi bot kapanmasın). */
+   Sır tanımlı DEĞİLSE istek REDDEDİLİR (fail-closed).
+   Eskiden `true` dönüyordu: TICKET_SECRET/SESSION_SECRET boşsa 22 yazma ucu
+   sadece discordId yazarak açılıyordu. Artık sır yoksa 503, bilet yoksa 401. */
 const TICKET_SECRET = process.env.TICKET_SECRET || process.env.SESSION_SECRET || "";
 let _ticketUyariVerildi = false;
 function _ticketIzinli(req, res, discordId) {
   if (!TICKET_SECRET) {
     if (!_ticketUyariVerildi) {
       _ticketUyariVerildi = true;
-      console.warn("[TICKET] TICKET_SECRET/SESSION_SECRET tanimli degil — yazma uclari hala discordId ile acik.");
+      console.error("[TICKET] TICKET_SECRET/SESSION_SECRET tanimli degil — launcher bilet uclari KAPALI (fail-closed).");
     }
-    return true;
+    res.status(503).json({ error: "launcher dogrulamasi yapilandirilmamis" });
+    return false;
   }
   const reddet = (kod, hata) => { res.status(kod).json({ error: hata }); return false; };
   const baslik = String(req.get("authorization") || "");
@@ -269,6 +272,40 @@ function _ticketIzinli(req, res, discordId) {
   const beklenen = crypto.createHmac("sha256", TICKET_SECRET).update(`${p[0]}.${p[1]}`).digest("hex");
   if (!crypto.timingSafeEqual(Buffer.from(beklenen, "hex"), Buffer.from(p[2], "hex"))) {
     return reddet(401, "bilet gecersiz");
+  }
+  return true;
+}
+
+/* ── Admin/site yetkisi (kimlik gerektiren okuma uçları için) ───────────────
+   `x-bot-secret` (BOT_API_SECRET) VEYA kullanıcının kendi launcher bileti.
+   Bilet varsa yalnızca kendi discordId'si için geçerli; site sırrı varsa hepsi.
+   _botAuth'tan farkı: sır yoksa 404 değil 401 döner. */
+function _idIzinli(req, res, discordId) {
+  const botS = String(BOT_API_SECRET || "");
+  if (botS) {
+    const gelen = String(req.get("x-bot-secret") || "");
+    if (gelen.length === botS.length &&
+        crypto.timingSafeEqual(Buffer.from(gelen), Buffer.from(botS))) return true;
+  }
+  if (!TICKET_SECRET) {
+    res.status(401).json({ error: "unauthorized" });
+    return false;
+  }
+  const baslik = String(req.get("authorization") || "");
+  const bilet = baslik.startsWith("Bearer ") ? baslik.slice(7).trim() : "";
+  const p = bilet.split(".");
+  if (p.length !== 3) {
+    res.status(401).json({ error: "unauthorized" });
+    return false;
+  }
+  if (p[0] !== String(discordId)) { res.status(403).json({ error: "bilet bu hesaba ait degil" }); return false; }
+  const exp = Number(p[1]);
+  if (!Number.isFinite(exp) || exp < Date.now()) { res.status(401).json({ error: "bilet suresi dolmus" }); return false; }
+  if (!/^[0-9a-f]{64}$/i.test(p[2])) { res.status(401).json({ error: "bilet gecersiz" }); return false; }
+  const beklenen = crypto.createHmac("sha256", TICKET_SECRET).update(`${p[0]}.${p[1]}`).digest("hex");
+  if (!crypto.timingSafeEqual(Buffer.from(beklenen, "hex"), Buffer.from(p[2], "hex"))) {
+    res.status(401).json({ error: "bilet gecersiz" });
+    return false;
   }
   return true;
 }
@@ -512,6 +549,8 @@ app.get("/api/config/:id", async (req, res) => {
     const liste = Array.isArray(db.get("configler")) ? db.get("configler") : [];
     if (String(req.query.durum || "").toLowerCase() === "approved") {
       const kullanici = hedef.replace(/\D/g, "");
+      // Bir kullanıcının TÜM config içeriklerini listeler → kimlik zorunlu.
+      if (!_idIzinli(req, res, kullanici)) return;
       const configs = liste
         .filter(c => c && c.durum === "kabul" && String(c.discordId) === kullanici)
         .map(c => ({
@@ -530,6 +569,8 @@ app.get("/api/config/:id", async (req, res) => {
     const cfg = liste.find(c => c && String(c.id) === hedef);
     if (!cfg) return res.status(404).json({ error: "bulunamadı" });
     if (cfg.durum !== "kabul") return res.status(403).json({ error: "onaylanmamış" });
+    // Kimlik: config sahibinin bileti ya da site sırrı.
+    if (!_idIzinli(req, res, String(cfg.discordId || ""))) return;
     const sadeceGoruntule = ["1", "true", "evet", "yes"].includes(String(req.query.goruntule || "").toLowerCase());
     if (!sadeceGoruntule) {
       cfg.indirme = (cfg.indirme || 0) + 1;
@@ -645,8 +686,63 @@ app.post("/api/public/vote", express.json(), (req, res) => {
   } catch { res.status(500).json({ error: "hata" }); }
 });
 
+/* ── Public config indirme yetkisi ────────────────────────────────────────
+   Site sırrı (x-bot-secret) VEYA geçerli bir launcher bileti. İçerik public
+   profile olduğu için bilet sahibi olmak yeterli (başkasının config'ini indiren
+   kullanıcı normaldir). Kimliksiz istek → 401.
+   Ek olarak IP başına dakikada 30 indirme sınırı (sayaç şişmesi/kazıma). */
+const _INDIRME_PENCERE = 60 * 1000;
+const _INDIRME_MAX = 30;
+const _indirmeLimit = new Map();
+function _indirmeIzinli(req, res) {
+  // Site sırrı
+  const botS = String(BOT_API_SECRET || "");
+  if (botS) {
+    const gelen = String(req.get("x-bot-secret") || "");
+    if (gelen.length === botS.length &&
+        crypto.timingSafeEqual(Buffer.from(gelen), Buffer.from(botS))) {
+      return _indirmeSay(req, res);
+    }
+  }
+  // Launcher bileti (herhangi bir imzalı kullanıcı)
+  if (TICKET_SECRET) {
+    const baslik = String(req.get("authorization") || "");
+    const bilet = baslik.startsWith("Bearer ") ? baslik.slice(7).trim() : "";
+    const p = bilet.split(".");
+    if (p.length === 3 && /^\d{15,20}$/.test(p[0]) &&
+        Number(p[1]) > Date.now() && /^[0-9a-f]{64}$/i.test(p[2])) {
+      const beklenen = crypto.createHmac("sha256", TICKET_SECRET).update(`${p[0]}.${p[1]}`).digest("hex");
+      if (crypto.timingSafeEqual(Buffer.from(beklenen, "hex"), Buffer.from(p[2], "hex"))) {
+        return _indirmeSay(req, res);
+      }
+    }
+  }
+  res.status(401).json({ error: "launcher girişi gerekli" });
+  return false;
+}
+function _indirmeSay(req, res) {
+  try {
+    const ip = String(req.ip || req.get("x-forwarded-for") || "?").split(",")[0].trim();
+    const simdi = Date.now();
+    const kuyruk = (_indirmeLimit.get(ip) || []).filter(t => simdi - t < _INDIRME_PENCERE);
+    if (kuyruk.length >= _INDIRME_MAX) {
+      res.status(429).json({ error: "çok fazla indirme, biraz bekle" });
+      return false;
+    }
+    kuyruk.push(simdi);
+    _indirmeLimit.set(ip, kuyruk);
+    if (_indirmeLimit.size > 3000) {
+      for (const [k, v] of _indirmeLimit) if (!v.some(t => simdi - t < _INDIRME_PENCERE)) _indirmeLimit.delete(k);
+    }
+    return true;
+  } catch { return true; }
+}
+
 /* Public config indirme: /api/public/config/:id → içerik (base64) + indirme sayacı.
-   İstemci bu ucu "Public" sekmesinden indirmek için kullanır. */
+   İstemci bu ucu "Public" sekmesinden indirmek için kullanır.
+   NOT: public profile'lar tasarım gereği paylaşılabilir; ancak indirme sayacını
+   şişirmemek ve kimliksiz toplu kazımayı yavaşlatmak için bilet veya site sırrı
+   istenir. Panel (liste + detay) zaten /api/public/configs'ten geliyor. */
 app.get("/api/public/config/:id", (req, res) => {
   try {
     const hedef = String(req.params.id || "");
@@ -654,6 +750,7 @@ app.get("/api/public/config/:id", (req, res) => {
     const cfg = liste.find(c => c && String(c.id) === hedef);
     if (!cfg) return res.status(404).json({ error: "bulunamadı" });
     if (cfg.durum !== "kabul") return res.status(403).json({ error: "onaylanmamış" });
+    if (!_indirmeIzinli(req, res)) return;
     // "goruntule" (view-only) modunda indirme sayacını ARTIRMA: detay panelini açmak
     // indirme değildir; aksi halde "Most Downloaded" sıralaması şişer.
     const sadeceGoruntule = ["1", "true", "evet", "yes"].includes(String(req.query.goruntule || "").toLowerCase());
@@ -814,26 +911,63 @@ function _etiketAta(id) {
     id = String(id || "").replace(/\D/g, "").slice(0, 20);
     if (!id) return null;
     const mevcut = db.get(`rbetiket_${id}`);
-    if (mevcut && mevcut.tag) return mevcut;
+    if (mevcut && mevcut.tag) {
+      /* Etiketin AD kismi Discord adi degistikce guncellenir; numara ayni kalir.
+         Ölçülen hata: etiket bir kez atanip donduruluyordu. Kullanici Discord
+         adini degistirdiginde Vape Online yeni adi gosterirken friends listesi
+         ESKI etikette kaliyordu -> "vape online'daki isim friendsteki ile ayni
+         olmali" sikayeti. Numara (kisisel ve degistirilemez) korunur, sadece
+         ad kismi yeniden yazilir; boylece numara degismez, eski etiketle
+         kayitli arkadaslarin baglanti koptugunu sanmayiz. */
+      let canliAd = null;
+      try { canliAd = client.users.cache.get(id)?.username || null; } catch {}
+      const temizCanli = _etiketTemizle(canliAd);
+      const eskiAd = String(mevcut.ad || "");
+      if (canliAd && temizCanli !== "RiseBunny" && temizCanli !== eskiAd) {
+        const yeniTag = `${temizCanli}#${String(mevcut.no || String(mevcut.tag).split("#").pop())}`;
+        if (yeniTag !== mevcut.tag) {
+          const duzeltilmis = { ...mevcut, ad: temizCanli, tag: yeniTag, adGuncel: Date.now() };
+          try { db.set(`rbetiket_${id}`, duzeltilmis); } catch {}
+          return duzeltilmis;
+        }
+      }
+      return mevcut;
+    }
     let discordAd = null;
     try { discordAd = client.users.cache.get(id)?.username || null; } catch {}
     const ad = _etiketTemizle(discordAd);
+    /* Benzersizlik artik NUMARA bazli: _etiketBul numarayla cozuyor, bu yuzden
+       ayni numara iki kisiye verilirse etiketler cakisir ve isim eslesmesi
+       yanlis kisiyi isaret eder. Hem numara hem tam etiket tutulur. */
+    const kullanilanNo = new Set();
     const kullanilan = new Set();
     try {
       const tum = db.all() || {};
       for (const k of Object.keys(tum)) {
         if (!k.startsWith("rbetiket_")) continue;
         const v = tum[k];
-        if (v && v.tag) kullanilan.add(String(v.tag));
+        if (v && v.tag) {
+          kullanilan.add(String(v.tag));
+          const vn = String(v.no || String(v.tag).split("#").pop() || "");
+          if (vn) kullanilanNo.add(vn);
+        }
       }
     } catch {}
     let no = null, tag = null;
-    for (let deneme = 0; deneme < 200 && !tag; deneme++) {
+    for (let deneme = 0; deneme < 500 && !tag; deneme++) {
       const adayNo = String(Math.floor(1000 + Math.random() * 9000));
       const aday = `${ad}#${adayNo}`;
-      if (!kullanilan.has(aday)) { no = adayNo; tag = aday; }
+      if (!kullanilan.has(aday) && !kullanilanNo.has(adayNo)) { no = adayNo; tag = aday; }
     }
-    if (!tag) { no = String(Date.now() % 9000 + 1000); tag = `${ad}#${no}`; }
+    if (!tag) {
+      /* 9000 kombinasyon tukendi: deterministik benzersiz numara ara. */
+      for (let n = 1000; n <= 9999; n++) {
+        const s = String(n);
+        if (kullanilanNo.has(s)) continue;
+        no = s; tag = `${ad}#${s}`; break;
+      }
+      if (!tag) { no = String(Date.now() % 9000 + 1000); tag = `${ad}#${no}`; }
+    }
     const kayit = { tag, ad, no, at: Date.now() };
     try { db.set(`rbetiket_${id}`, kayit); } catch {}
     return kayit;
@@ -849,11 +983,18 @@ function _etiketBul(ham) {
     }
     const m = s.match(/^(.+)#(\d{4})$/);
     if (!m) return null;
+    const numara = m[2];
     const tum = db.all() || {};
+    /* 1) Etiket numarasi KISMI yetki: isim kismi degisse de (Discord adi
+          degistiyse) numara degismedigi icin eski kayit cozulur. Numara
+          kisisel ve degistirilemez; isim degisimi numarayi degistirmez. */
     for (const k of Object.keys(tum)) {
       if (!k.startsWith("rbetiket_")) continue;
       const v = tum[k];
-      if (v && String(v.tag).toLowerCase() === s.toLowerCase()) {
+      if (!v) continue;
+      const vTag = String(v.tag || "");
+      const vNo = String(v.no || vTag.split("#").pop() || "");
+      if (vNo === numara || vTag.toLowerCase() === s.toLowerCase()) {
         return { id: k.slice("rbetiket_".length), ...v };
       }
     }
@@ -1239,6 +1380,7 @@ app.post("/api/presence", express.json({ limit: "16kb" }), async (req, res) => {
     if (!_ticketIzinli(req, res, discordId)) return;
     const username = String(req.body?.username || "").slice(0, 60);
     db.set(`presence_${discordId}`, { at: Date.now(), username });
+    _presenceOnbellekTazele();
     _kayitYaz(discordId, username);
     res.json({ ok: true });
   } catch { res.status(500).json({ error: "hata" }); }
@@ -1249,6 +1391,7 @@ app.post("/api/presence/leave", express.json({ limit: "16kb" }), async (req, res
     if (!discordId || discordId.length < 15) return res.status(400).json({ error: "geçersiz discordId" });
     if (!_ticketIzinli(req, res, discordId)) return;
     try { db.delete(`presence_${discordId}`); } catch {}
+    _presenceOnbellekTazele();
     try {
       const k = `launcher_kayit_${discordId}`;
       const eski = db.get(k) || {};
@@ -1271,27 +1414,54 @@ app.post("/api/presence/same", express.json({ limit: "16kb" }), async (req, res)
     db.set(`presence_${discordId}`, server
       ? { at: Date.now(), username, server }
       : { at: Date.now(), username });
+    _presenceOnbellekTazele();
     _kayitYaz(discordId, username);
     if (!server) return res.json({ ok: true, users: [] });
-    const tum = db.all() || {};
+    /* Performans + sızıntı sertleştirmesi:
+       - Her istekte TÜM veritabanını taramak yerine yalnızca `presence_*`
+         anahtarları 15 sn boyunca önbelleklenir.
+       - Listede kendi kaydı dışında kimseye Discord ID'si verilmez; yalnızca
+         takma ad (username) döner. İstemci kimliği zaten kendi gönderdiği
+         bilete göre biliyor. */
+    const tum = _presenceAnlikGoruntu();
     const simdi = Date.now();
     const users = [];
-    for (const k of Object.keys(tum)) {
-      if (!k.startsWith("presence_")) continue;
+    for (const [k, kayit] of tum) {
       if (k === `presence_${discordId}`) continue;
-      const kayit = tum[k] || {};
       if (!kayit.server || kayit.server !== server) continue;
       if (!kayit.at || simdi - kayit.at > 5 * 60 * 1000) continue;
-      users.push({ discordId: k.slice("presence_".length), username: String(kayit.username || "").slice(0, 60) });
+      users.push({ username: String(kayit.username || "").slice(0, 60) });
       if (users.length >= 100) break;
     }
     res.json({ ok: true, users });
   } catch { res.status(500).json({ error: "hata" }); }
 });
+
+/* presence_* anahtarlarının 15 sn'lik anlık görüntüsü (db.all() her istekte çağrılmasın). */
+const _presenceCache = { at: 0, veri: new Map() };
+function _presenceOnbellekTazele() { _presenceCache.at = 0; }
+function _presenceAnlikGoruntu() {
+  const simdi = Date.now();
+  if (simdi - _presenceCache.at < 15000 && _presenceCache.veri.size) return _presenceCache.veri;
+  const harita = new Map();
+  try {
+    const hepsi = db.all() || {};
+    for (const k of Object.keys(hepsi)) {
+      if (k.startsWith("presence_")) harita.set(k, hepsi[k] || {});
+    }
+  } catch {}
+  _presenceCache.at = simdi;
+  _presenceCache.veri = harita;
+  return harita;
+}
+/* Bu uçlar aynı veriyi /api/user/:id ile döndürüyor. Korumasız bırakılırsa
+   Discord ID'sini bilen herkes bakiye + envanter + premium + tag okuyabiliyordu.
+   Artık site sırrı (x-bot-secret) veya kullanıcının kendi launcher bileti gerekir. */
 app.get("/api/dogrula/:id", async (req, res) => {
   try {
     const id = String(req.params.id || "").replace(/\D/g, "").slice(0, 20);
     if (!id) return res.status(400).json({ error: "geçersiz id" });
+    if (!_idIzinli(req, res, id)) return;
     let username = client.users.cache.get(id)?.username || null;
     let avatar = client.users.cache.get(id)?.displayAvatarURL?.({ extension: "png" }) || null;
     if (!username) {
@@ -1312,6 +1482,7 @@ app.get("/api/kullanici/:id", async (req, res) => {
   try {
     const id = String(req.params.id || "").replace(/\D/g, "").slice(0, 20);
     if (!id) return res.status(400).json({ error: "geçersiz id" });
+    if (!_idIzinli(req, res, id)) return;
     const wallet = Number(db.fetch(`para_${id}`) || 0);
     const bank = Number(db.fetch(`bankapara_${id}`) || 0);
     const xp = Number(db.fetch(`xp_${id}`) || 0);
@@ -1320,6 +1491,12 @@ app.get("/api/kullanici/:id", async (req, res) => {
     res.json({
       id, username, wallet, bank, total: wallet + bank, xp, level: U.xpSeviye(xp),
       premium: _premiumJson(id).premium, daysLeft: _premiumJson(id).daysLeft,
+      /* Etiket burada da donuyor: client.js bu ucu /user/<id> olarak proxy'liyor
+         ve istemci tarafi "vape online"daki isimle friends'takini karsilastiriyor.
+         Ikisi ayni kaynaktan gelmeli, yoksa isim eslesmesi koptugu icin arkadas
+         listesi hep bos kaldi. */
+      tag: (_etiketAta(id) || {}).tag || null,
+      avatar: client.users.cache.get(id)?.displayAvatarURL?.({ extension: "png" }) || null,
       pets: db.fetch(`pets_${id}`) || [], capes: db.fetch(`launcher_capes_${id}`) || []
     });
   } catch { res.status(500).json({ error: "hata" }); }
@@ -1556,12 +1733,19 @@ app.get("/api/stats", (req, res) => {
   } catch { res.json({ servers: 0, users: 0, commands: 0, categories: 0 }); }
 });
 
+const _rbStatusCache = { at: 0, pending: 0 };
 app.get("/api/risebrawl-status", (req, res) => {
+  /* Sadece genel durum bilgisi döner. db.all() hatasının METNİ dışarı verilmez
+     (dosya yolu / iç yapı sızdırabilir). Ağır tarama 60 sn önbellekli. */
   try {
-    const all = Object.values(db.all() || {});
-    const pending = all.filter(k => k && k.tur && k.tag).length;
-    res.json({ brand: "RiseBrawl", version: "28 RISE", live: true, pending });
-  } catch (e) { res.json({ brand: "RiseBrawl", version: "28 RISE", live: false, reason: String(e.message || e) }); }
+    const simdi = Date.now();
+    if (!_rbStatusCache.at || simdi - _rbStatusCache.at > 60000) {
+      const all = Object.values(db.all() || {});
+      _rbStatusCache.pending = all.filter(k => k && k.tur && k.tag).length;
+      _rbStatusCache.at = simdi;
+    }
+    res.json({ brand: "RiseBrawl", version: "28 RISE", live: true, pending: _rbStatusCache.pending });
+  } catch { res.json({ brand: "RiseBrawl", version: "28 RISE", live: false }); }
 });
 app.get("/api/site-status", (req, res) => {
   const site = db.fetch("site_bakim") || null;
@@ -2021,45 +2205,146 @@ client.on("guildMemberAdd", async (member) => {
   } catch {}
 });
 
+/**
+ * Hoşgeldin / güle güle kartı.
+ *
+ * Sağlamlık notları:
+ *  • `db.fetch` ve dil fonksiyonları try/catch içinde → tek hata tüm sistemi düşürmez.
+ *  • Üye önbellekte yoksa (partial / ayrılma) istek üzerinden tamamlanır.
+ *  • Kanal önce önbellekten, yoksa API'den alınır (silinmiş/erişimi kapanmış kanal güvenli atlanır).
+ *  • Avatar indirme: node-superfetch varsa o, yoksa global fetch (Node 18+) kullanılır.
+ */
 async function hosgeldinKart(member, ayrildiMi) {
   try {
-    const key = `gçkanal_${member.guild.id}`;
-    if (!db.fetch(key)) return;
-    const kanal = member.guild.channels.cache.get(db.fetch(key));
-    if (!kanal?.isTextBased()) return;
-    const { request } = { request: require("node-superfetch") };
-    const Canvas = require("@napi-rs/canvas");
+    if (!member || !member.guild) return;
+
+    // Ayrılan üyeler için kullanıcı bilgisi eksik gelebilir → tamamla
+    let user = member.user;
+    if (!user) {
+      user = await member.client.users.fetch(member.id).catch(() => null);
+      if (!user) return;
+    }
+
+    const guild = member.guild;
+    let kanalId = null;
+    try { kanalId = db.fetch(`gçkanal_${guild.id}`); } catch {}
+    if (!kanalId) return;
+
+    let kanal = guild.channels.cache.get(kanalId) || null;
+    if (!kanal) kanal = await guild.channels.fetch(kanalId).catch(() => null);
+    if (!kanal?.isTextBased?.()) return;
+    // Botun kanala yazma izni yoksa boşuna canvas üretmeyelim
+    const izinler = kanal.permissionsFor?.(guild.members.me);
+    if (izinler && !izinler.has("SendMessages")) return;
+
+    const dil = (id) => { try { return getGuildLang(id); } catch { return "tr"; } };
+    const EN = dil(guild.id) === "en";
+
+    // Avatar adresi her durumda erişilebilir bir PNG olsun (gif/webp değil)
+    const avatarURL = user.displayAvatarURL({ extension: "png", size: 1024, forceStatic: true });
+
+    // Canvas yoksa sadece metin mesajı gönder (sistem tamamen susmasın)
+    const metinGonder = async () => {
+      let msj = null;
+      try { msj = db.fetch(`cikisM_${guild.id}`); } catch {}
+      if (!msj) {
+        msj = ayrildiMi
+          ? (EN ? "{uye} left the server." : "{uye} sunucudan ayrıldı.")
+          : (EN ? "{uye} joined the server." : "{uye} sunucuya katıldı.");
+      }
+      await kanal.send(String(msj).replace(/\{uye\}/g, `<@${user.id}>`).replace(/\{sunucu\}/g, guild.name)).catch(() => {});
+    };
+
+    let Canvas;
+    try { Canvas = require("@napi-rs/canvas"); } catch { return metinGonder(); }
+
     const canvas = Canvas.createCanvas(640, 360);
     const ctx = canvas.getContext("2d");
-    const bg = await Canvas.loadImage(ayrildiMi
+
+    // Arka plan: önce uzak görsel, olmazsa yerel gradient (görsel linkleri ölmüş olabilir)
+    const bgUrl = ayrildiMi
       ? "https://media.discordapp.net/attachments/1118567518454423593/1159876865931083797/Picsart_23-10-06_18-36-17-972.jpg"
-      : "https://media.discordapp.net/attachments/1118567518454423593/1159876866199523348/Picsart_23-10-06_18-34-40-006.jpg").catch(() => null);
-    if (!bg) return;
-    ctx.drawImage(bg, 0, 0, canvas.width, canvas.height);
-    ctx.strokeStyle = "#74037b";
-    ctx.strokeRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#FFFFFF";
-    try { ctx.font = '37px sans-serif'; } catch {}
+      : "https://media.discordapp.net/attachments/1118567518454423593/1159876866199523348/Picsart_23-10-06_18-34-40-006.jpg";
+    const bg = await Canvas.loadImage(bgUrl).catch(() => null);
+    if (bg) {
+      ctx.drawImage(bg, 0, 0, canvas.width, canvas.height);
+    } else {
+      const g = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+      if (ayrildiMi) {
+        g.addColorStop(0, "#2b0b12"); g.addColorStop(1, "#5c1020");
+      } else {
+        g.addColorStop(0, "#0b1e2b"); g.addColorStop(1, "#123a4d");
+      }
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      // yumuşak halkalar
+      for (let i = 1; i <= 4; i++) {
+        ctx.beginPath();
+        ctx.strokeStyle = ayrildiMi ? `rgba(255,90,120,${0.05 * i})` : `rgba(120,220,255,${0.05 * i})`;
+        ctx.lineWidth = 2;
+        ctx.arc(canvas.width - 60, 40, 40 * i, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+
+    ctx.strokeStyle = ayrildiMi ? "#b0354f" : "#74037b";
+    ctx.lineWidth = 6;
+    ctx.strokeRect(3, 3, canvas.width - 6, canvas.height - 6);
     ctx.textAlign = "center";
-    ctx.fillText(`${member.user.username}`.slice(0, 20), 300, 270);
-    const avatarURL = member.user.displayAvatarURL({ extension: "png", size: 1024 });
-    const { body } = await request.get(avatarURL).catch(() => ({}));
-    if (!body) return;
-    const avatar = await Canvas.loadImage(body).catch(() => null);
-    if (!avatar) return;
+    ctx.fillStyle = "#FFFFFF";
+    try { ctx.font = "bold 34px sans-serif"; } catch {}
+    ctx.fillText(String(user.username).slice(0, 20), 320, 285);
+    ctx.fillStyle = "rgba(255,255,255,0.72)";
+    try { ctx.font = "18px sans-serif"; } catch {}
+    ctx.fillText(ayrildiMi ? (EN ? "left the server" : "sunucudan ayrıldı") : (EN ? "welcome!" : "hoş geldin!"), 320, 315);
+
+    const avatar = await Canvas.loadImage(avatarURL).catch(() => null);
+    if (!avatar) return metinGonder(); // avatar alınamazsa metinle devam
+
+    // yuvarlak avatar çerçevesi
+    ctx.save();
     ctx.beginPath();
-    ctx.arc(250 + 55, 55 + 55, 55, 0, 2 * Math.PI, false);
+    ctx.arc(320, 150, 72, 0, Math.PI * 2, false);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(255,255,255,0.15)";
+    ctx.fill();
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = ayrildiMi ? "#ff5a78" : "#7ce7ff";
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(320, 150, 65, 0, Math.PI * 2, false);
+    ctx.closePath();
     ctx.clip();
-    ctx.drawImage(avatar, 250, 55, 110, 110);
-    const dosya = new Discord.AttachmentBuilder(canvas.toBuffer("image/png"), { name: ayrildiMi ? "RiseBunny-bb.png" : "RiseBunny-hg.png" });
-    await kanal.send({ files: [dosya] }).catch(() => {});
-    let msj = db.fetch(`cikisM_${member.guild.id}`) || `{uye}, ${ayrildiMi ? (getGuildLang(member.guild.id) === "en" ? "Left the server." : "Sunucudan Ayrıldı.") : (getGuildLang(member.guild.id) === "en" ? "Joined the server." : "Sunucuya Katıldı.")}`;
-    await kanal.send(String(msj).replace("{uye}", `${member}`).replace("{sunucu}", member.guild.name)).catch(() => {});
-    if (member.user.bot) await kanal.send(getGuildLang(member.guild.id) === "en" ? `🤖 This is a bot, ${member.user.tag}` : `🤖 Bu bir bot, ${member.user.tag}`).catch(() => {});
-  } catch {}
+    ctx.drawImage(avatar, 255, 85, 130, 130);
+    ctx.restore();
+
+    const dosya = new Discord.AttachmentBuilder(canvas.toBuffer("image/png"), {
+      name: ayrildiMi ? "RiseBunny-bb.png" : "RiseBunny-hg.png",
+    });
+    const gonderildi = await kanal.send({ files: [dosya] }).catch(() => null);
+    if (!gonderildi) return; // kanala yazamıyorsak metin de gitmez
+
+    let msj = null;
+    try { msj = db.fetch(`cikisM_${guild.id}`); } catch {}
+    if (!msj) {
+      msj = ayrildiMi
+        ? (EN ? "{uye} left the server." : "{uye} sunucudan ayrıldı.")
+        : (EN ? "{uye} joined the server." : "{uye} sunucuya katıldı.");
+    }
+    await kanal.send(String(msj).replace(/\{uye\}/g, `<@${user.id}>`).replace(/\{sunucu\}/g, guild.name)).catch(() => {});
+    if (user.bot) {
+      await kanal.send(EN ? `🤖 This is a bot, ${user.tag}` : `🤖 Bu bir bot, ${user.tag}`).catch(() => {});
+    }
+  } catch (e) {
+    console.error("[Hoşgeldin] kart hatası:", e?.message || e);
+  }
 }
-client.on("guildMemberRemove", (m) => hosgeldinKart(m, true));
-client.on("guildMemberAdd", (m) => hosgeldinKart(m, false));
+
+client.on("guildMemberRemove", (m) => { hosgeldinKart(m, true); });
+client.on("guildMemberAdd", (m) => { hosgeldinKart(m, false); });
 
 const REKLAM = [".com", ".net", ".xyz", ".tk", ".pw", ".io", ".me", ".gg", "www.", "https", "http", ".gl", ".org", ".com.tr", ".biz", ".rf", ".gd", ".az", ".party", ".gf"];
 async function reklamKontrol(msg, duzenlemeMi) {
