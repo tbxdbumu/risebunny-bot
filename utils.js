@@ -724,6 +724,11 @@ async function siteMesajKaydet({ discordId, username, subject, message, lang }) 
 module.exports = {
   db,
   firestoreSil,
+  /* Seviye bildirimi hedefi: r!seviye-ayar ayarına göre kanal seçer.
+     Ayrı dosyada tutulur (komutlar/seviye-ayar.js) ki bot.js döngüsel
+     bağımlılık kurmadan erişebilsin. */
+  seviyeHedefi: (guild, kaynakKanal) => require("./komutlar/seviye-ayar").seviyeHedefi(guild, kaynakKanal),
+  seviyeAyari: (guildId) => require("./komutlar/seviye-ayar").ayarAl(guildId),
   DESTEK,
   SITE_MAGAZA,
   satisDuyuruSatir,

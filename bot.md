@@ -503,7 +503,135 @@ Test dosyaları:
 
 ---
 
-## 10. Destek linkleri
+## 10. Otomasyon kapatma + seviye mesaj ayarı (2026)
+
+### 10.1 Otomasyona `kapat` / `aç` eklendi — `komutlar/otomasyon.js`
+
+**Eski durum:** `kapat` alt komutu vardı ama:
+- aynı `sub` dizisinde `"kapat"` **iki kez** yazılıydı (`sub === "kapat" || sub === "off" || sub === "kapat"`)
+- kapatılmış otomasyonu **tekrar açmanın yolu yoktu** — `r!otomasyon aç` kurulum akışını
+  yeniden başlatıyor, eğitim verileri duruyordu ama ayarlar (ticket kategorisi, modlog)
+  sıfırlanıyordu
+- kapatma/açma **kimin ne zaman** yaptığı kaydedilmiyordu
+- kullanıcıya "tekrar nasıl açarım" söylenmiyordu
+
+**Yeni davranış:**
+
+| Komut | Sonuç |
+|-------|-------|
+| `r!otomasyon kapat` | `aktif=false`, **veri durur** (eğitim, kategori, modlog korunur) |
+| `r!otomasyon aç` | Kayıt varsa **yerinde devam** (ayarlar korunur, kurulum yeniden çalışmaz) |
+| `r!otomasyon aç` | Kayıt yoksa **kurulum akışı** başlar (eski davranış) |
+| `r!otomasyon durum` | Aktif/duraklatılmış durumu gösterir |
+
+Ek alanlar: `kapatanId`, `kapatmaTarihi`, `acanId`, `acmaTarihi`.
+Kapatma yanıtına `acKullanim` ipucu eklendi (TR+EN).
+
+**Neden `aç` bilinçli olarak `db.fetch()` kontrolüne bağlandı:**
+`aç` komutu iki farklı iş yapıyor — kayıt varsa "devam ettir", yoksa "kurulum".
+Tek blok olsaydı ve kayıt yokken de eşleşseydi kurulum **hiç başlamazdı**
+(kullanıcı "otomasyon aktif değil" alır ama nasıl kuracağını öğrenemezdi).
+Bu yüzden koşul: `(sub === "aç" || ...) && db.fetch(\`otomasyon_\${gid}\`)`.
+
+### 10.2 🆕 `r!seviye-ayar` — `komutlar/seviye-ayar.js`
+
+**Sorun:** `bot.js:2136` ve `2139`'da seviye mesajı doğrudan `msg.channel.send` ile
+**mesajın atıldığı kanala** gidiyordu. Ayar yoktu, kapatma yoktu. Yoğun sunucularda
+XP kazanan herkesin seviye bildirimi aynı kanala düşüyordu.
+
+**Yeni komut:**
+
+```
+r!seviye-ayar                    → mevcut ayarı göster (embed)
+r!seviye-ayar aç                 → mesajları aç
+r!seviye-ayar kapat / sessiz     → mesajları TAMAMEN kapat
+r!seviye-ayar kanal #kanal       → tüm mesajları tek kanala topla
+r!seviye-ayar kanal sıfırla      → kanalı temizle, kaynak kanala dön
+```
+
+Aliaslar: `seviyeayar`, `level-settings`, `levelsettings`, `seviyemesaj`
+
+**Yetki:** `ManageGuild` (Sunucuyu Yönet) — `permLevel: 0` ama gerçek izin `run`
+içinde `PermissionFlagsBits.ManageGuild` olarak denetleniyor. `ai/executor.js`
+`komutYetkisi()` bunu kaynak koddan okudu:
+```
+seviye-ayar yetki: {"ad":"Sunucuyu Yönet","izinler":["ManageGuild"],"kodIzni":true,...}
+```
+
+**Veri:** `db` anahtarı `seviye_ayar_<guildId>` = `{ mesaj: "acik"|"kapali", kanal: "id"|null }`
+
+### 10.3 Kritik tasarım kararı — `seviyeHedefi()`
+
+`bot.js` döngüsel bağımlılık kurmadan ayara erişsin diye `utils.js` üzerinden:
+
+```js
+// utils.js exports
+seviyeHedefi: (guild, kaynakKanal) => require("./komutlar/seviye-ayar").seviyeHedefi(guild, kaynakKanal),
+seviyeAyari:  (guildId) => require("./komutlar/seviye-ayar").ayarAl(guildId),
+```
+
+`seviyeHedefi(guild, kaynakKanal)` üç sonuç döndürür:
+
+| Durum | `gonder` | `kanal` | `sebep` |
+|-------|----------|---------|---------|
+| Ayar yok (varsayılan) | `true` | kaynak kanal | `varsayilan` |
+| Mesaj kapatıldı | `false` | `null` | `kapali` |
+| Kanal ayarlandı | `true` | ayarlı kanal | `ayarli` |
+| Ayarlı kanal silinmiş | `false` | `null` | `kanal-yok` |
+| Kaynak kanal metin değil | `false` | `null` | `kaynak-yok` |
+
+**Bilinçli karar — ayarlı kanal silinmişse kaynağa DÜŞMEZ.**
+Sunucu sahibi "mesajlar sadece #seviye kanalına" dediyse, o kanal silindiğinde
+mesajları her yere saçmak ayarı yok saymak olur. Sessizce durması daha doğru.
+
+### 10.4 Seviye mesajı `bot.js` içindeki değişiklik
+
+**Önce** (2 ayrı `msg.channel.send`, ayar yok):
+```js
+if (odul > 0) { db.add(`para_${uid}`, odul); await msg.channel.send({...}); }
+else { await msg.channel.send({...}); }
+```
+
+**Sonra** (tek yol, kontrollü):
+```js
+if (odul > 0) db.add(`para_${uid}`, odul);   // ödül HER ZAMAN verilir
+const seviyeHedef = U.seviyeHedefi ? U.seviyeHedefi(msg.guild, msg.channel) : { gonder: true, kanal: msg.channel };
+if (seviyeHedef.gonder && seviyeHedef.kanal) {
+  await seviyeHedef.kanal.send({ embeds: [...] }).catch(() => {});
+}
+```
+
+**Önemli:** mesaj kapalı olsa bile **XP, para ödülü ve seviye rolü verilmesi
+etkilenmez.** Sadece görsel bildirim gizlenir. Bu `r!seviye-ayar durum` embed'inin
+altbilgisinde de yazıyor.
+
+### 10.5 Doğrulama
+
+| Test | Sonuç |
+|------|-------|
+| `seviye-ayar` mantık testi (`seviye-ayar-test.js`) | **24/24** |
+| `otomasyon` kapat/aç akışı (`otomasyon-test.js`) | **18/18** |
+| 183 komut dosyası yükleniyor | **182/183** (`_kart.js` yardımcı modül) |
+| Tüm `.js` dosyaları `node --check` | **0 hata** |
+| `komutYetkisi('seviye-ayar')` → `ManageGuild` | ✅ |
+| `komutYetkisi('ban')` regresyon | ✅ `BanMembers` |
+
+Test edilen sınır durumları: bozuk kayıt (`"bozuk-string"`), geçersiz `mesaj`
+değeri, sayısal `kanal` ID'si, ses kanalı hedefi, `guild=null`, `kaynakKanal=null`,
+sunucular arası izolasyon, yetkisiz kullanıcı, premium engeli.
+
+### 10.6 ⚠️ Notlar
+
+1. **Mevcut sunucular etkilenmez** — ayar kaydı olmayan sunucuda davranış
+   **eskisi gibi** (mesajın atıldığı kanala gider). Kırılma yok.
+2. **Kanal seçerken bot izni kontrol edilir** — o kanalda `SendMessages` yoksa
+   komut ayarı **kaydetmez**, önce izni ister. Aksi halde ayar sessizce ölürdü.
+3. `r!seviye-ayar kanal #x` yazınca, mesajlar kapalıysa **otomatik açılır**
+   (kanal ayarlıyorsan mesaj görmek istiyorsun demektir).
+
+---
+
+## 11. Destek linkleri
 
 - **Site:** `https://risebunny.vercel.app/risebunny`
 - **Kısa link:** `https://dsc.gg/risebunny`

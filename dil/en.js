@@ -191,6 +191,7 @@ module.exports = {
     zatenKurulu: "ℹ️ Otomasyon already installed ({sayi} saved questions). Settings: `r!otomasyon settings` • Status: `r!otomasyon status`",
     devamEdiyor: "✅ Premium renewed, otomasyon resumed!",
     kapatildiDurur: "✅ Otomasyon disabled (data kept, not working). Full delete: `r!otomasyon veri sil`",
+    acKullanim: "To enable it again: `r!otomasyon aç` (training data is kept)",
     veriSilOk: "🗑️ All otomasyon data deleted.",
     kanalOk: "✅ No-answer channel set: {kanal}",
     kurulumSoru: "📝 Setup 1/4 — type the training question (`cancel` to abort):",

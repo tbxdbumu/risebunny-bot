@@ -91,14 +91,36 @@ exports.run = async (client, message, args) => {
   const gid = message.guild.id;
 
   // --- Kapat: çalışmayı durdurur, VERİLER DURUR ---
-  if (sub === "kapat" || sub === "off" || sub === "kapat") {
+  if (sub === "kapat" || sub === "off" || sub === "durdur" || sub === "stop") {
     const kayit = db.fetch(`otomasyon_${gid}`);
     if (!kayit?.aktif) return message.reply(t(lang, "otomasyon.durumYok")).catch(() => {});
+    if (kayit.duraklatildi) {
+      return message.reply(t(lang, "otomasyon.durumDuraklatildi")).catch(() => {});
+    }
     kayit.aktif = false;
+    kayit.kapatanId = message.author.id;
+    kayit.kapatmaTarihi = Date.now();
     try { db.set(`otomasyon_${gid}`, kayit); } catch {}
     try { ownerLog(client, `🤖 **Otomasyon kapatıldı (veriler duruyor):** **${message.guild.name}** (${gid}) — ${message.author.tag} (<@${message.author.id}>)`).catch(() => {}); } catch {}
     try { modlogGonder(message.guild, t(lang, "otomasyon.kapatildiDurur")); } catch {}
-    return message.reply(t(lang, "otomasyon.kapatildiDurur")).catch(() => {});
+    return message.reply(t(lang, "otomasyon.kapatildiDurur") + `\n\n💡 ${t(lang, "otomasyon.acKullanim")}`).catch(() => {});
+  }
+
+  // --- Devam ettir: kapatılmış otomasyonu yeniden açar (veriler korunur) ---
+  // Not: kayıt yoksa kurulum akışına düşer (aşağıdaki "Aç / kurulum" bloğu).
+  if ((sub === "aç" || sub === "ac" || sub === "devam" || sub === "resume" || sub === "başlat" || sub === "baslat")
+      && db.fetch(`otomasyon_${gid}`)) {
+    const kayit = db.fetch(`otomasyon_${gid}`);
+    if (kayit.aktif && !kayit.duraklatildi) return message.reply(t(lang, "otomasyon.zatenKurulu", { sayi: sunucuSayilari(gid).soru })).catch(() => {});
+    if (kayit.kuran !== SAHIP_ID && !isPremium(kayit.kuran)) return message.reply(t(lang, "ortak.premiumGerek")).catch(() => {});
+    kayit.aktif = true;
+    kayit.duraklatildi = false;
+    kayit.acanId = message.author.id;
+    kayit.acmaTarihi = Date.now();
+    try { db.set(`otomasyon_${gid}`, kayit); } catch {}
+    try { ownerLog(client, `🤖 **Otomasyon yeniden açıldı:** **${message.guild.name}** (${gid}) — ${message.author.tag} (<@${message.author.id}>)`).catch(() => {}); } catch {}
+    try { modlogGonder(message.guild, t(lang, "otomasyon.devamEdiyor")); } catch {}
+    return message.reply(t(lang, "otomasyon.devamEdiyor")).catch(() => {});
   }
 
   // --- Veri sil: TÜM otomasyon verilerini kalıcı siler ---

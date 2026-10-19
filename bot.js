@@ -2130,13 +2130,22 @@ client.on("messageCreate", async (msg) => {
       if (rolId && msg.guild.roles.cache.get(rolId)) {
         await msg.member.roles.add(rolId).catch(() => {});
       }
-      if (odul > 0) {
-        db.add(`para_${uid}`, odul);
-        const ekstra = rolId ? (lang === "en" ? ` and the <@&${rolId}> role!` : ` ve <@&${rolId}> rolünü!`) : "";
-        await msg.channel.send({ embeds: [new Discord.EmbedBuilder().setColor("Gold").setTitle(lang === "en" ? "🎉 Level Up!" : "🎉 Seviye Atladın!").setDescription(lang === "en" ? `${msg.author}, you reached **Level ${seviye}** and earned **${odul.toLocaleString()} 💸**${ekstra}` : `${msg.author}, **Seviye ${seviye}** oldun ve **${odul.toLocaleString()} 💸** kazandın${ekstra}`)] }).catch(() => {});
-      } else {
-        const ekstra = rolId ? (lang === "en" ? ` You got the <@&${rolId}> role!` : ` <@&${rolId}> rolünü aldın!`) : "";
-        await msg.channel.send({ embeds: [new Discord.EmbedBuilder().setColor("Gold").setTitle(lang === "en" ? "🎉 Level Up!" : "🎉 Seviye Atladın!").setDescription(lang === "en" ? `${msg.author}, you reached **Level ${seviye}**!${ekstra}` : `${msg.author}, **Seviye ${seviye}** oldun!${ekstra}`)] }).catch(() => {});
+      if (odul > 0) db.add(`para_${uid}`, odul);
+
+      /* Seviye bildirimi: r!seviye-ayar ile kapatılabilir veya tek kanala
+         toplanabilir. Ayar XP/ödül/rol vermeyi ETKİLEMEZ — sadece bildirim. */
+      const ekstra = rolId ? (lang === "en" ? ` You got the <@&${rolId}> role!` : ` <@&${rolId}> rolünü aldın!`) : "";
+      const ekstraOdul = odul > 0 ? (lang === "en" ? ` and earned **${odul.toLocaleString()} 💸**` : ` ve **${odul.toLocaleString()} 💸** kazandın`) : "";
+      const seviyeHedef = U.seviyeHedefi ? U.seviyeHedefi(msg.guild, msg.channel) : { gonder: true, kanal: msg.channel };
+      if (seviyeHedef.gonder && seviyeHedef.kanal) {
+        await seviyeHedef.kanal.send({
+          embeds: [new Discord.EmbedBuilder()
+            .setColor("Gold")
+            .setTitle(lang === "en" ? "🎉 Level Up!" : "🎉 Seviye Atladın!")
+            .setDescription(lang === "en"
+              ? `${msg.author}, you reached **Level ${seviye}**${ekstraOdul}!${ekstra}`
+              : `${msg.author}, **Seviye ${seviye}** oldun${ekstraOdul}!${ekstra}`)]
+        }).catch(() => {});
       }
     }
   } catch {}

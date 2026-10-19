@@ -191,6 +191,7 @@ module.exports = {
     zatenKurulu: "ℹ️ Otomasyon zaten kurulu ({sayi} kayıtlı soru). Ayarlar: `r!otomasyon ayar` • Durum: `r!otomasyon durum`",
     devamEdiyor: "✅ Premium yenilendi, otomasyon devam ediyor!",
     kapatildiDurur: "✅ Otomasyon kapatıldı (veriler duruyor, çalışmıyor). Tamamen silmek için: `r!otomasyon veri sil`",
+    acKullanim: "Tekrar açmak için: `r!otomasyon aç` (eğitim verileri korunur)",
     veriSilOk: "🗑️ Tüm otomasyon verileri silindi.",
     kanalOk: "✅ Cevapsız sorular kanalı ayarlandı: {kanal}",
     kurulumSoru: "📝 Kurulum 1/4 — eğitim sorusunu yazın (iptal için `iptal`):",
