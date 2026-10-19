@@ -642,8 +642,7 @@ verilemezse sessizce ölüyordu. Yeni komut bunların hepsini çözer.
 | Komut | Ne yapar |
 |---|---|
 | `r!girisrol ekle @rol [@rol2 ...]` | Rol(ler)i **sırayla** verilecek listeye ekler |
-| `r!girisrol sil @rol` | Tek rolü listeden çıkarır |
-| `r!girisrol sil --hepsi` | Listeyi tamamen temizler (sistem kapanır) |
+| `r!girisrol sil @rol` | Tek rolü listeden çıkarır || `r!girisrol sil --hepsi` | Listeyi tamamen temizler (sistem kapanır) |
 | `r!girisrol liste` | Özet + **hiyerarşi uyarısı** |
 | `r!girisrol kapat` / `aç` | Sistemi durdurur / devam ettirir (roller **korunur**) |
 | `r!girisrol kanal #kanal` | Hoş geldin bildirimi kanalı |
@@ -678,6 +677,14 @@ Yetki: **Sunucuyu Yönet** (`ManageGuild`).
    "muhtemel sebep: botun rolü aşağıda" satırıyla düşer.
 7. **Geriye dönük uyum.** Ayar yoksa davranış **eskisi gibi** (eski `otoRL`
    bloğu çalışır). `girisrol_idler_*` eski tek-string kaydı diziye çevrilir.
+8. **Ham rol ID kabul edilir.** Etiket şart değil: `r!girisrol ekle 123456789012345678`
+   çalışır. ID `/^\d{15,25}$/` ile doğrulanır (rol ID'leri 17-19 hane).
+   Kanal ve rol etiketleri de (`<@&123>`, `<#123>`) temizlenip sadece rakam
+   kullanılır.
+9. **Var olmayan ID sessizce yutulmaz.** Eski kod `if (!rol) continue;` diyordu;
+   kullanıcı yanlış ID yazdığında "eklendi" sanıyordu. Artık
+   `**Bulunamadı:** \`123...\`` satırıyla raporlanır, geçerli olanlar yine
+   eklenir.
 
 ### DB anahtarları (hepsi sunucu bazlı)
 
@@ -714,9 +721,22 @@ hiyerarşi uyarısı, eski string kaydının diziye çevrilmesi.
 Komut yükleme: **183 komut**, `girisrol` kayıtlı, sözdizimi hatası yok.
 `bot.js` / `girisrol.js` / `utils.js` / `dil/tr.js` / `dil/en.js` → `node --check` temiz.
 
-> **Testin yakaladığı gerçek hata:** `member.roles.add(rol, ...)` nesne
-> geçiyordu. Sahte üye önbelleği bunu `[object Object]` olarak yazınca
-> "zaten olan rol tekrar eklenmez" testi patladı. `rol.id` ile düzeltildi.
+`girisrol-id-test.js` — **21/21 geçti**. Ham ID yolu, mention kullanmadan:
+tek/çoklu ID ile ekleme, sıra, var olmayan ID raporu, geçerli+geçersiz
+karışık, botun üstündeki rol, `managed` rol, ID ile silme, listede olmayan
+ID ile silme, kanal ID, aynı ID'yi iki kez yazma.
+
+> **Testin yakaladığı gerçek hatalar:**
+> 1. `member.roles.add(rol, ...)` nesne geçiyordu. Sahte üye önbelleği bunu
+>    `[object Object]` yazınca "zaten olan rol tekrar eklenmez" testi patladı.
+>    `rol.id` ile düzeltildi.
+> 2. Var olmayan ID `if (!rol) continue;` ile sessizce yutuluyordu.
+>    `**Bulunamadı:**` raporu eklendi.
+>
+> **Testin kendi hatası:** Sahte rol ID'leri 3 haneli (`501`) üretiliyordu;
+> komut `/^\d{15,25}$/` ile doğruladığı için hepsi reddedildi. Gerçek Discord
+> ID uzunluğuna çekildi. Komut doğruydu, test yanlıştı — bu ayrımı yapmadan
+> "kodu düzeltmek" regex'i bozardı.
 
 ---
 

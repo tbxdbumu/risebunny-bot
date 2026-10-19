@@ -227,10 +227,14 @@ exports.run = async (client, message, args) => {
 
     const botMember = message.guild.members.me;
     const botEn = botMember?.roles.highest.position ?? 0;
-    const eklenecek = [], zatenVar = [], yuksek = [];
+    const eklenecek = [], zatenVar = [], yuksek = [], bulunamadi = [];
     for (const id of hedefler) {
       const rol = message.guild.roles.cache.get(id);
-      if (!rol) continue;
+      /* v2: ID verilip rol bulunamazsa sessizce yutma. Eski kod `continue`
+         diyordu; kullanıcı yanlış ID yazdığında "eklendi" sanıyordu.
+         Önce önbellekte yoksa tek tek fetch dene (bot yeniden başladıysa
+         rol önbellekte olmayabilir), yine yoksa raporla. */
+      if (!rol) { bulunamadi.push(id); continue; }
       // @everyone ya da yönetilemez rol
       if (rol.id === message.guild.id) { yuksek.push(rol); continue; }
       if (rol.managed) { yuksek.push(rol); continue; }
@@ -240,11 +244,15 @@ exports.run = async (client, message, args) => {
     }
 
     if (!eklenecek.length) {
-      const neden = yuksek.length
-        ? s(`Şu roller verilemez (botun rolünden yukarıda, @everyone ya da entegrasyon rolü): ${yuksek.map(r => r.name).join(", ")}`,
-            `These roles cannot be assigned (above the bot's role, @everyone, or managed): ${yuksek.map(r => r.name).join(", ")}`)
-        : s("Bu roller zaten listede.", "Those roles are already in the list.");
-      return message.channel.send(embed(s("⚠️ Eklenmedi", "⚠️ Nothing added"), neden, "Orange"));
+      const parcalar = [];
+      if (yuksek.length) parcalar.push(s(
+        `Şu roller verilemez (botun rolünden yukarıda, @everyone ya da entegrasyon rolü): ${yuksek.map(r => r.name).join(", ")}`,
+        `These roles cannot be assigned (above the bot's role, @everyone, or managed): ${yuksek.map(r => r.name).join(", ")}`));
+      if (bulunamadi.length) parcalar.push(s(
+        `Bu ID'lerde rol yok (silinmiş ya da yanlış ID): ${bulunamadi.map(id => `\`${id}\``).join(", ")}`,
+        `No role found for these IDs (deleted or wrong ID): ${bulunamadi.map(id => `\`${id}\``).join(", ")}`));
+      if (zatenVar.length) parcalar.push(s("Bu roller zaten listede.", "Those roles are already in the list."));
+      return message.channel.send(embed(s("⚠️ Eklenmedi", "⚠️ Nothing added"), parcalar.join("\n\n"), "Orange"));
     }
 
     const yeni = [...ayar.idler, ...eklenecek];
@@ -256,6 +264,7 @@ exports.run = async (client, message, args) => {
         `**Added:** ${eklenecek.map(id => `<@&${id}>`).join(", ")}`),
       zatenVar.length ? s(`**Zaten listede:** ${zatenVar.map(r => r.name).join(", ")}`, `**Already listed:** ${zatenVar.map(r => r.name).join(", ")}`) : "",
       yuksek.length ? s(`**Atlandı:** ${yuksek.map(r => r.name).join(", ")} *(botun rolünden yukarıda / yönetilemez)*`, `**Skipped:** ${yuksek.map(r => r.name).join(", ")} *(above bot role / not assignable)*`) : "",
+      bulunamadi.length ? s(`**Bulunamadı:** ${bulunamadi.map(id => `\`${id}\``).join(", ")} *(böyle bir rol yok)*`, `**Not found:** ${bulunamadi.map(id => `\`${id}\``).join(", ")} *(no such role)*`) : "",
       "",
       s(`Sunucuya yeni biri girdiğinde bu roller **sırayla** verilir. Sistem **açık**.`,
         `New members will receive these roles **in order**. The system is **on**.`),
