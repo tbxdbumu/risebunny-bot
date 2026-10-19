@@ -2558,7 +2558,76 @@ client.giveawaysManager.on("giveawayEnded", async (giveaway, winners) => {
   } catch {}
 });
 
+/* ── r!girisrol: çoklu rol + bildirim kanalı (bkz. komutlar/girisrol.js) ──
+   Eski otoRL_ dinleyicisinden ÖNCE çalışır çünkü o dinleyici tek rol alıp
+   hemen çıkar; girisrol ayarı varsa asıl işi bu blok yapar ve alttaki
+   otorol bloğunu atlar (aksi halde iki rol birden verilir). */
 client.on("guildMemberAdd", async (member) => {
+  try {
+    const GR = require("./komutlar/girisrol");
+    const ayar = GR.ayarAl(member.guild.id);
+    if (!ayar.acik || !ayar.idler.length) return;
+
+    /* Sistem açıksa bu üye artık girisrol tarafından yönetiliyor. İşareti
+       HEMEN koy: aşağıdaki erken çıkışlarda da eski otoRL bloğu çalışmamalı,
+       yoksa üyeye iki rol birden verilir. */
+    try { member.__girisrolIslendi = true; } catch {}
+
+    // Botlara dokunma (ayar açık değilse)
+    if (member.user.bot && !ayar.botlara) return;
+
+    // Yeni hesap koruması
+    if (ayar.yeniHesabiAtla && GR.yeniHesapMi(member.user)) {
+      const otoId = db.fetch(`otoRL_${member.guild.id}`);
+      if (otoId) { try { await member.roles.add(otoId, "Otomatik rol (yeni hesap)").catch(() => {}); } catch {} }
+      const kh = ayar.kanal ? member.guild.channels.cache.get(ayar.kanal) : null;
+      if (kh?.isTextBased()) {
+        const gl = getGuildLang(member.guild.id);
+        await kh.send({ embeds: [new Discord.EmbedBuilder().setColor("Orange").setTimestamp().setFooter({ text: "RiseBunny" })
+          .setDescription(gl === "en"
+            ? `⚠️ **${member.user.username}** joined, but the account is too new (< ${GR.MISAFIR_GUN}d) — role skipped.`
+            : `⚠️ **${member.user.username}** katıldı ama hesabı çok yeni (< ${GR.MISAFIR_GUN} gün) — rol verilmedi.`)
+        ] }).catch(() => {});
+      }
+      return;
+    }
+
+    const sonuc = await GR.rolVer(member, ayar.idler, { kayitsizRolunuSil: ayar.kayitsizRolunuSil });
+
+    // Hiç rol verilemediyse ownerLog'a düş — sessiz başarısızlık olmasın
+    if (!sonuc.verilen.length && sonuc.hata.length) {
+      try {
+        const { ownerLog } = require("./utils");
+        ownerLog(client, `🚪 **Giriş rolü verilemedi** — ${member.guild.name} (\`${member.guild.id}\`)\n` +
+          `Üye: ${member.user.tag} (\`${member.id}\`)\n` +
+          `Hatalı roller: ${sonuc.hata.map(id => `<@&${id}>`).join(", ")}\n` +
+          `Muhtemel sebep: botun rolü bu rollerin **altında** (Sunucu Ayarları → Roller).`);
+      } catch {}
+    }
+
+    const kanal = ayar.kanal ? member.guild.channels.cache.get(ayar.kanal) : null;
+    if (kanal?.isTextBased()) {
+      const gl = getGuildLang(member.guild.id);
+      const verilenler = sonuc.verilen.map(id => `<@&${id}>`).join(", ");
+      const e = new Discord.EmbedBuilder().setColor("Green").setTimestamp().setFooter({ text: "RiseBunny" })
+        .setThumbnail(member.user.displayAvatarURL({ size: 128 }))
+        .setDescription(
+          (gl === "en"
+            ? `**${member.user.username}** welcome! You are member #**${member.guild.memberCount}**.`
+            : `**${member.user.username}** hoş geldin! **${member.guild.memberCount}.** üyemizsin.`) +
+          (verilenler ? (gl === "en" ? `\n\n🎭 Roles: ${verilenler}` : `\n\n🎭 Rollerin: ${verilenler}`) : "") +
+          (sonuc.hata.length && gl === "en" ? `\n\n⚠️ Could not assign: ${sonuc.hata.map(id => `<@&${id}>`).join(", ")}` : "") +
+          (sonuc.hata.length && gl !== "en" ? `\n\n⚠️ Verilemeyen: ${sonuc.hata.map(id => `<@&${id}>`).join(", ")}` : "")
+        );
+      await kanal.send({ embeds: [e] }).catch(() => {});
+    }
+  } catch (e) {
+    console.error("girisrol guildMemberAdd:", e?.message || e);
+  }
+});
+
+client.on("guildMemberAdd", async (member) => {
+  if (member.__girisrolIslendi) return; // r!girisrol ayarı varsa bu blok atlanır
   try {
     const rol = db.fetch(`otoRL_${member.guild.id}`);
     if (!rol) return;

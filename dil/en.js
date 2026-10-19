@@ -351,6 +351,7 @@ module.exports = {
     "otorol-mesaj": { aciklama: "Sets the auto role message.", kullanim: "autorole-message <text>" },
     "otorol-mesaj-sıfırla": { aciklama: "Resets the auto role message.", kullanim: "autorole-message-reset" },
     "otorol-kapat": { aciklama: "Disables auto role.", kullanim: "autorole-reset" },
+    "girisrol": { aciklama: "Auto role for new members (multiple roles, log channel, new-account protection).", kullanim: "joinrole add @role [@role2]" },
     "oylama": { aciklama: "Starts a poll.", kullanim: "poll <text>" },
     "para-ekle": { aciklama: "Adds money to a user. (Staff)", kullanim: "add-money @user <amount>" },
     "transfer": { aciklama: "Transfers money to an IBAN.", kullanim: "transfer <iban> <amount>" },

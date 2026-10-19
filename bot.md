@@ -631,7 +631,96 @@ sunucular arası izolasyon, yetkisiz kullanıcı, premium engeli.
 
 ---
 
-## 11. Destek linkleri
+## 11. Giriş rolü komutu — `r!girisrol` (2026)
+
+Sunucuya yeni girene **otomatik rol** veren komut. Eski `r!otorol-ayarla`
+yetmiyordu: tek rol, botlara da veriyordu, hiyerarşi kontrolü yoktu ve
+verilemezse sessizce ölüyordu. Yeni komut bunların hepsini çözer.
+
+### Alt komutlar
+
+| Komut | Ne yapar |
+|---|---|
+| `r!girisrol ekle @rol [@rol2 ...]` | Rol(ler)i **sırayla** verilecek listeye ekler |
+| `r!girisrol sil @rol` | Tek rolü listeden çıkarır |
+| `r!girisrol sil --hepsi` | Listeyi tamamen temizler (sistem kapanır) |
+| `r!girisrol liste` | Özet + **hiyerarşi uyarısı** |
+| `r!girisrol kapat` / `aç` | Sistemi durdurur / devam ettirir (roller **korunur**) |
+| `r!girisrol kanal #kanal` | Hoş geldin bildirimi kanalı |
+| `r!girisrol kanal-sil` | Bildirimi kapatır (rol verilmeye devam eder) |
+| `r!girisrol bot aç\|kapat` | Botlara da rol verilsin mi (varsayılan **hayır**) |
+| `r!girisrol misafir aç\|kapat` | Hesabı yeni olanları atla (varsayılan **hayır**) |
+| `r!girisrol rol aç\|kapat` | Eski `otorol` (kayıtsız) rolünü otomatik kaldır (varsayılan **açık**) |
+
+Yetki: **Sunucuyu Yönet** (`ManageGuild`).
+
+### Tasarım kararları
+
+1. **`ManageGuild`, `Administrator` değil.** Rol dağıtan bir komut için
+   Yönetici şartı gereksiz genişti; sunucu yöneten herkes kullanabilir.
+2. **Hiyerarşi önden kontrol edilir.** Botun rolünden **yukarıda** olan,
+   `@everyone` olan ve `managed` (entegrasyon) roller listeye **hiç eklenmez**,
+   kullanıcıya "şu roller verilemez" diye raporlanır. `r!girisrol liste`
+   ayrıca mevcut listede sorun varsa uyarır — Discord'un sessiz
+   `Missing Permissions` hatası kullanıcıyı kör bırakıyordu.
+3. **`member.roles.add(rol.id, ...)` — nesne değil.** İlk yazımda `rol`
+   nesnesi geçiliyordu; discord.js bunu resolvable sayıp çalıştırıyor ama
+   önbellek karşılaştırmalarında belirsizleşiyor. Test bunu yakaladı, ID'ye
+   çevrildi (bkz. §12).
+4. **Çift rol koruması.** `guildMemberAdd` dinleyicisi birden fazla yerde
+   (`hosgeldinKart`, `otoRL`, `kayıthg`). `girisrol` açıksa üyeye hemen
+   `member.__girisrolIslendi = true` işareti konur ve eski `otoRL` bloğu
+   erken çıkar. İşaret **erken çıkışlardan önce** konur, yoksa bot/ yeni hesap
+   yolunda iki rol birden verilirdi.
+5. **Kanal seçerken izin kontrolü.** O kanalda `SendMessages` yoksa ayar
+   **kaydedilmez**, önce izin istenir.
+6. **Sessiz başarısızlık yok.** Hiçbir rol verilemezse `ownerLog`'a
+   "muhtemel sebep: botun rolü aşağıda" satırıyla düşer.
+7. **Geriye dönük uyum.** Ayar yoksa davranış **eskisi gibi** (eski `otoRL`
+   bloğu çalışır). `girisrol_idler_*` eski tek-string kaydı diziye çevrilir.
+
+### DB anahtarları (hepsi sunucu bazlı)
+
+| Anahtar | Tip | Anlamı |
+|---|---|---|
+| `girisrol_idler_<gid>` | `string[]` | Verilecek roller (sırayla) |
+| `girisrol_acik_<gid>` | `0\|1` | Açık mı (yok = liste varsa açık) |
+| `girisrol_kanal_<gid>` | `string` | Bildirim kanalı |
+| `girisrol_bot_<gid>` | `0\|1` | Botlara rol ver |
+| `girisrol_misafir_<gid>` | `0\|1` | Yeni hesabı atla |
+| `girisrol_rolsil_<gid>` | `0\|1` | Eski kayıtsız rolünü kaldır |
+
+Yeni hesap eşiği `GIRISROL_MISAFIR_GUN` env ile değişebilir (varsayılan 7).
+
+### Yeni / değişen dosyalar (§11)
+
+- `komutlar/girisrol.js` — **yeni**, ~470 satır. `ayarAl()`, `ayarYaz()`,
+  `rolVer()`, `yeniHesapMi()` dışa açık (bot.js ve testler kullanıyor).
+- `bot.js` — yeni `guildMemberAdd` dinleyicisi (satır ~2565), eski `otoRL`
+  dinleyicisine `__girisrolIslendi` koruması (satır ~2632).
+- `dil/tr.js`, `dil/en.js` — `girisrol` yardım kaydı.
+
+### Doğrulama
+
+`girisrol-test.js` — **48/48 geçti**. Kapsanan: yetki reddi, tek/çoklu rol
+ekleme, sıra koruma, botun üstündeki rol reddi, `managed` rol reddi,
+`@everyone` reddi, ham ID ile ekleme, silme, `--hepsi`, kapat/aç (roller
+korunuyor mu), rol yokken aç reddi, üç bayrak + değersiz çağrıda durum
+gösterme, kanal kaydı, izinsiz kanal reddi, `kanal-sil`, `rolVer()` atama,
+zaten olan rolü tekrar eklememe, eski kayıtsız rolünü kaldırma (açık ve
+kapalı), yeni hesap tespiti, bilinmeyen alt komut, yardım ekranı,
+hiyerarşi uyarısı, eski string kaydının diziye çevrilmesi.
+
+Komut yükleme: **183 komut**, `girisrol` kayıtlı, sözdizimi hatası yok.
+`bot.js` / `girisrol.js` / `utils.js` / `dil/tr.js` / `dil/en.js` → `node --check` temiz.
+
+> **Testin yakaladığı gerçek hata:** `member.roles.add(rol, ...)` nesne
+> geçiyordu. Sahte üye önbelleği bunu `[object Object]` olarak yazınca
+> "zaten olan rol tekrar eklenmez" testi patladı. `rol.id` ile düzeltildi.
+
+---
+
+## 12. Destek linkleri
 
 - **Site:** `https://risebunny.vercel.app/risebunny`
 - **Kısa link:** `https://dsc.gg/risebunny`

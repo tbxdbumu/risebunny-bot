@@ -285,6 +285,21 @@ const DURAK = new Set([
   "nasil", "neden", "nicin", "neler", "nelerdir", "nedir", "nerede", "nereden", "nasilsin",
   "the", "a", "an", "is", "are", "to", "of", "in", "on", "for", "and", "or", "do", "does",
   "i", "you", "it", "what", "how", "why", "where", "can", "my",
+  /* ── v2: soru kalıpları ──
+     Bunlar bilgi taşımaz, sadece cümleyi soruya çevirir. Listede olmadıkları
+     için "mrbeast kimdir" → "kim" kökü yakalanıp "sahibin kim" ile
+     eşleşiyordu (skor 0.90). "kimdir" kök bulucuda "kim"e iniyor, bu yüzden
+     kök hali de ("kim") listede. */
+  "kim", "kimdir", "kime", "kimi", "kimin", "kimler",
+  "kac", "kacar", "kacinci", "hangi", "hangisi", "hangileri",
+  "misin", "mısın", "musun", "müsün",
+  "nedir", "neydi", "napiyor", "naparsin", "napabilir", "napabilirim",
+  /* ── v2: İngilizce soru kalıpları ──
+     "what ur model" → "ur" kökü kalıyordu; "you" listesi "ur/u"yu kapsamıyordu. */
+  "ur", "your", "you", "u", "me", "we", "us", "they", "them", "he", "she",
+  "whats", "which", "who", "whom", "whose", "when", "tell", "about", "there",
+  "is", "was", "were", "be", "am", "this", "that", "these", "those",
+  "please", "pls", "plz", "hey", "hi", "hello",
 ]);
 
 function tokenizeFull(text) {
@@ -307,6 +322,33 @@ function kokler(text, genisletMi = true) {
   for (const w of kaynak) for (const b of kelimeBicimleri(w)) set.add(b);
   const out = [...set];
   return genisletMi ? genislet(out) : out;
+}
+
+/**
+ * v2: KELİME BAZLI kapsam — "kaç kelime gerçekten tutuyor?"
+ *
+ * Neden ayrı fonksiyon: `kokler()` kelime→kök eşlemesini kaybediyor.
+ * "bugun" kelimesi kök listesine "bugun" VE "bug" olarak iki giriş yapar.
+ * Kök listesi üzerinden sayım yapılırsa tek kelime 2 eşleşme sanılır ve
+ * kapsam 1.00 çıkar ("bugun hava nasil" → "saat kaç" hatası).
+ *
+ * Burada her kelime BİR kez değerlendirilir: tam hali VEYA sıyrılmış hali
+ * dokümanda geçiyorsa o kelime "tuttu" sayılır.
+ *
+ * @returns {{tutulan:number, toplam:number, oran:number}}
+ */
+function kelimeKapsami(text, dokKokleri) {
+  const tumu = tokenizeFull(text);
+  const bilgi = tumu.filter(w => !DURAK.has(w) && !DURAK.has(kok(w)));
+  const kaynak = bilgi.length ? bilgi : tumu.filter(w => !DURAK.has(w));
+  const kelimeler = kaynak.length ? kaynak : tumu;
+  if (!kelimeler.length) return { tutulan: 0, toplam: 0, oran: 0 };
+
+  let tutulan = 0;
+  for (const w of kelimeler) {
+    if (kelimeBicimleri(w).some(b => dokKokleri.has(b))) tutulan++;
+  }
+  return { tutulan, toplam: kelimeler.length, oran: tutulan / kelimeler.length };
 }
 
 function trigrams(s) {
@@ -476,18 +518,29 @@ class SoruEslestirici {
 dokumanSkoru(normSorgu, sorguKokleri, dok, idfIdx, ozKokler = null, ozKelimeSayisi = 0) {
   const oz = ozKokler || sorguKokleri;
 
-  let ozEslesen = 0;
-  for (const k of oz) if (dok.kokler.has(k)) ozEslesen++;
-  // Öz kapsam: kelime başına EN FAZLA 1 kök eşleşmiş sayılır (tam+sıyrılmış çift sayılmasın)
-  const ozKapsam = ozKelimeSayisi > 0
-    ? Math.min(1, Math.min(ozEslesen, ozKelimeSayisi) / ozKelimeSayisi)
-    : (oz.length ? ozEslesen / oz.length : 0);
+  /* ── v2 KAPSAM: kelime bazlı (bkz. kelimeKapsami) ──
+     Eski hesap kök listesi üzerinden yapılıyordu ve "bugun" gibi tek bir
+     kelimenin 2 biçimi ("bugun" + "bug") 2 eşleşme sayılıyordu.
+     "bugun hava nasil" → kapsam 1.00 → "saat kaç" cevabı.
+     Artık her kelime en fazla 1 kez sayılır. */
+  const kk = kelimeKapsami(normSorgu, dok.kokler);
+  const ozKapsam = ozKelimeSayisi > 0 ? kk.oran : (oz.length
+    ? [...oz].filter(k => dok.kokler.has(k)).length / oz.length
+    : 0);
 
   let genisEslesen = 0;
   for (const k of sorguKokleri) if (dok.kokler.has(k)) genisEslesen++;
   const genisKapsam = sorguKokleri.length ? genisEslesen / sorguKokleri.length : 0;
 
   if (genisEslesen === 0) return null;
+
+  /* ── v2 GÜVENLİK KAPISI: bilgi taşıyan kelime eşleşmesi YOKSA skor üretme ──
+     Eski hata: "risebunny nedir" ↔ "launcher nasıl kurulur" 0.92 alıyordu.
+     Tek ortak kelime "nedir" idi (DURAK), yani hiçbir bilgi örtüşmesi yoktu;
+     skor tamamen trigram Dice'tan geliyordu. Artık kullanıcının yazdığı
+     ANLAMLI kelimelerden en az BİRİ dokümanda geçmiyorsa aday değil.
+     (Saf yazım hatası toleransı `bul()` içindeki ayrı Dice dalında korunur.) */
+  if (ozKapsam === 0) return null;
 
   // IDF ağırlıklı eşleşme (nadir kök daha değerli)
   let idfAldi = 0, idfToplam = 0;
@@ -496,7 +549,13 @@ dokumanSkoru(normSorgu, sorguKokleri, dok, idfIdx, ozKokler = null, ozKelimeSayi
     idfToplam += idf;
     if (dok.kokler.has(k)) idfAldi += idf;
   }
-  const idfOran = idfToplam > 0 ? idfAldi / idfToplam : genisKapsam;
+  const idfHam = idfToplam > 0 ? idfAldi / idfToplam : genisKapsam;
+  /* v2: IDF oranını kelime kapsamıyla çarp.
+     Eski hata: sorgunun TEK nadir kelimesi tutunca oran 1.0 oluyordu.
+     "mrbeast kimdir" → sadece "kim" (kök) tutuyordu, ama "kim" nadir sayılıp
+     idfOran=1.0 veriyordu → skor 0.90. Artık 4 kelimeden 1'i tutuyorsa
+     oran da 0.25'e iner; tam eşleşme tam puan alır. */
+  const idfOran = idfHam * ozKapsam;
 
   // Trigram Dice — yazım hatası toleransı (en iyi varyant)
   let diceSkor = 0;
@@ -504,13 +563,54 @@ dokumanSkoru(normSorgu, sorguKokleri, dok, idfIdx, ozKokler = null, ozKelimeSayi
     const d = dice(normSorgu, n);
     if (d > diceSkor) diceSkor = d;
   }
+  /* v2: aynı gerekçeyle Dice da kapsamla ölçeklenir.
+     Aksi halde sadece harf benzerliği olan (anlamı alakasız) dokümanlar
+     0.24 ağırlıktan tam puan alıyordu. Kapsam 0 ise yukarıdaki kapı zaten
+     döndürdü; burada en az 1 anlamlı kelime örtüşmesi var. */
+  const diceKatki = diceSkor * (0.35 + 0.65 * ozKapsam);
 
   // Uzunluk dengesi: çok kısa sorgu ↔ çok uzun doküman uyumsuzluğuna hafif ceza
   const sU = Math.max(1, normSorgu.length);
   const dU = Math.max(1, dok.normSorular.length ? Math.min(...dok.normSorular.map(x => x.length)) : 1);
   const uzunlukCarpani = 0.94 + 0.06 * (Math.min(sU, dU) / Math.max(sU, dU));
 
-  const skor = ((ozKapsam * 0.40) + (genisKapsam * 0.10) + (idfOran * 0.26) + (diceSkor * 0.24)) * uzunlukCarpani
+  /* ── v2 KAPSAM CEZASI ──
+     Eski hata: "risebunny nedir" 2 anlamlı kelimeden 1'ini tutuyor (kapsam
+     0.5) ama yine de 1.00 skor alıyordu; sonuç "bot çevrimdışı görünüyor".
+     Sebep: tek kelime tutunca kalan ağırlıklar (geniş kapsam + dice) doluyordu.
+
+     Kullanıcı 3 anlamlı kelime yazıp sadece 1'i tutuyorsa bu bir eşleşme
+     DEĞİL, tesadüftür. Kapsam düşükse skoru orantılı düşür:
+       kapsam 1.00 → ×1.00 (tam eşleşme, ceza yok)
+       kapsam 0.75 → ×0.81
+       kapsam 0.50 → ×0.50
+       kapsam 0.33 → ×0.19
+     Doğrusal değil karesel: kısmi örtüşmeyi hızla cezalandırır. */
+  const kapsamCeza = 0.35 + 0.65 * (ozKapsam * ozKapsam);
+
+  /* ── v2 TEK KELİME KAPISI ──
+     Sorguda yalnızca BİR anlamlı kelime varsa ("risebunny nedir" → sadece
+     "risebunny"), o kelime dokümanın ANA sorusunda mı yoksa sadece bir
+     VARYANTINDA mı geçiyor, buna bakılır.
+
+       "risebunny ne zamandan beri geliştiriliyor" → ana soruda geçiyor  ×1.00
+       "bot çevrimdışı görünüyor" ("risebunny offline" varyantı) → ×0.70
+
+     Aksi halde marka adı geçen her varyant aynı skoru alıyor ve yanlış
+     cevap dönüyordu. */
+  let tekKelimeCarpani = 1;
+  if (kk.toplam === 1) {
+    const sorguKelime = tokenizeFull(normSorgu).find(w => !DURAK.has(w) && !DURAK.has(kok(w)))
+      || tokenizeFull(normSorgu).find(w => !DURAK.has(w));
+    if (sorguKelime) {
+      const bicimler = kelimeBicimleri(sorguKelime);
+      const anaSoruda = bicimler.some(b => dok.koklerSoru?.has(b));
+      tekKelimeCarpani = anaSoruda === false ? 0.70 : 1;
+    }
+  }
+
+  const skor = ((ozKapsam * 0.40) + (genisKapsam * 0.10) + (idfOran * 0.26) + (diceKatki * 0.24))
+    * uzunlukCarpani * kapsamCeza * tekKelimeCarpani
     + (dok.kayit.oncelik || 0);
   return { skor: Math.min(1, skor), kapsam: ozKapsam, idfOran, diceSkor };
 }
@@ -545,12 +645,15 @@ dokumanSkoru(normSorgu, sorguKokleri, dok, idfIdx, ozKokler = null, ozKelimeSayi
 
     for (const dok of idfIdx.dokumanlar) {
       const s = this.dokumanSkoru(normSorgu, sorguKokleri, dok, idfIdx, ozKokler, ozKelimeSayisi);
-      // Hiç kök eşleşmesi yok: sadece yazım çok yakınsa aday olsun
+      // Hiç anlamlı kök eşleşmesi yok: SADECE yazım çok yakınsa aday olsun.
+      // v2: eşik 0.62 → 0.78. Eski değer "risebunny nedir" ↔ "launcher nasıl
+      // kurulur" gibi anlamca alakasız ama harfçe benzeyen çiftleri geçiriyordu.
+      // 0.78 yalnızca gerçek yazım hatalarını ("premıum" ↔ "premium") yakalar.
       if (!s) {
         let d = 0;
         for (const n of dok.normSorular) d = Math.max(d, dice(normSorgu, n));
-        if (d < 0.62) continue;
-        adaylar.push({ dok, skor: d * 0.9, kapsam: 0, diceSkor: d });
+        if (d < 0.78) continue;
+        adaylar.push({ dok, skor: d * 0.85, kapsam: 0, diceSkor: d });
         continue;
       }
       adaylar.push({ dok, skor: s.skor, kapsam: s.kapsam, diceSkor: s.diceSkor });
@@ -640,9 +743,16 @@ dokumanSkoru(normSorgu, sorguKokleri, dok, idfIdx, ozKokler = null, ozKelimeSayi
     if (!sorguKokleri.length) return [];
     const sinir = esik ?? this.esik * 0.8;
 
+    /* v2: `bul()` ile AYNI kapsam hesabı kullanılmalı.
+       Eski hata: ozKelimeSayisi verilmiyordu → kapsam kök sayısından
+       hesaplanıp şişiyordu, "risebunny nedir" → "launcher nasıl kurulur"
+       0.92 alıyordu. */
+    const ozKelimeler = tokenizeFull(soru).filter(w => !DURAK.has(w));
+    const ozKelimeSayisi = Math.max(1, (ozKelimeler.length ? ozKelimeler : tokenizeFull(soru)).length);
+
     const out = [];
     for (const dok of this.indeks.dokumanlar) {
-      const s = this.dokumanSkoru(normSorgu, sorguKokleri, dok, this.indeks, ozKokler);
+      const s = this.dokumanSkoru(normSorgu, sorguKokleri, dok, this.indeks, ozKokler, ozKelimeSayisi);
       if (!s) continue;
       if (s.skor >= sinir) out.push({ ...dok.kayit, skor: Number(s.skor.toFixed(3)) });
     }

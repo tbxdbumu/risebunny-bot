@@ -320,6 +320,7 @@ module.exports = {
     "otorol-mesaj": { aciklama: "Otorol mesajını ayarlar.", kullanim: "otorol-mesaj <metin>" },
     "otorol-mesaj-sıfırla": { aciklama: "Otorol mesajını sıfırlar.", kullanim: "otorol-mesaj-sıfırla" },
     "otorol-kapat": { aciklama: "Otorolü kapatır.", kullanim: "otorol-kapat" },
+    "girisrol": { aciklama: "Sunucuya girenlere otomatik rol verir (çoklu rol, bildirim kanalı, yeni hesap koruması).", kullanim: "girisrol ekle @rol [@rol2]" },
     "oylama": { aciklama: "Oylama başlatır.", kullanim: "oylama <metin>" },
     "para-ekle": { aciklama: "Kullanıcıya para ekler. (Yetkili)", kullanim: "para-ekle @kullanıcı <miktar>" },
     "transfer": { aciklama: "IBAN'a para transfer eder.", kullanim: "transfer <iban> <miktar>" },

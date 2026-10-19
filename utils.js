@@ -200,6 +200,77 @@ function bakimSebebi() {
   try { return db.fetch("8182bakımaç81") || null; } catch { return null; }
 }
 
+// ---------- Kullanıcı adı çözümleme ----------
+/**
+ * Bir Discord ID'sinden okunabilir kullanıcı adı bulur.
+ *
+ * Neden gerekli: premium temizleyici ve benzeri yerler yalnızca ID yazıyordu
+ * ("Kullanicinin premium suresi doldu: 740077229349797969 (740077229349797969)")
+ * — aynı ID iki kez, hiç isim yok. Sunucuda olmayan kişiler de aranabilsin
+ * diye üç kaynak sırayla denenir:
+ *
+ *   1. client.users.cache  — anında, bedava (botun gördüğü herkes)
+ *   2. client.users.fetch  — Discord API (sadece ortak sunucu varsa çalışır)
+ *   3. Firestore `users`   — siteye Discord ile girmiş herkes (sunucuda
+ *                            olmasa bile kayıtlıdır, bkz. siteUidBul)
+ *
+ * Hiçbiri bulamazsa `null` döner; çağıran taraf ID ile devam eder.
+ * Sonuç 10 dk önbelleklenir (temizleyici dakikada bir çalışıyor).
+ *
+ * @param {Client} client
+ * @param {string} uid Discord ID
+ * @returns {Promise<string|null>} "ahmetbs" gibi görünen ad (tag'siz)
+ */
+const _adOnbellek = new Map();
+const AD_ONBELLEK_MS = 10 * 60 * 1000;
+
+async function kullaniciAdiBul(client, uid) {
+  const id = String(uid || "").trim();
+  if (!/^\d{15,20}$/.test(id)) return null;
+
+  try {
+    const onb = _adOnbellek.get(id);
+    if (onb && Date.now() - onb.t < AD_ONBELLEK_MS) return onb.ad;
+  } catch {}
+
+  let ad = null;
+
+  // 1) Önbellek (bedava)
+  try {
+    const c = client?.users?.cache?.get(id);
+    if (c) ad = c.tag || c.username || null;
+  } catch {}
+
+  // 2) Discord API — ortak sunucu yoksa başarısız olur, sorun değil
+  if (!ad) {
+    try {
+      const u = await client.users.fetch(id, { force: false }).catch(() => null);
+      if (u) ad = u.tag || u.username || null;
+    } catch {}
+  }
+
+  // 3) Firestore `users` — siteye Discord ile girmiş herkes
+  if (!ad) {
+    try {
+      const kayit = await siteUidBul(id);
+      if (kayit?.kullaniciAdi) ad = kayit.kullaniciAdi;
+    } catch {}
+  }
+
+  try {
+    if (ad) {
+      _adOnbellek.set(id, { ad, t: Date.now() });
+      if (_adOnbellek.size > 2000) {
+        for (const [k, v] of _adOnbellek) {
+          if (Date.now() - v.t > AD_ONBELLEK_MS) _adOnbellek.delete(k);
+        }
+      }
+    }
+  } catch {}
+
+  return ad || null;
+}
+
 // ---------- Premium temizleyici ----------
 function startPremiumSweeper(client) {
   setInterval(async () => {
@@ -213,7 +284,13 @@ function startPremiumSweeper(client) {
         if (exp && exp <= Date.now()) {
           removePremium(uid);
           const { t, getLangSync } = require("./dil");
-          ownerLog(client, t("tr", "premium.sureDoldu", { kullanici: uid, id: uid }));
+          /* v2: ID yerine kullanıcı adı. Bulunamazsa "<@id>" mention'a düşer
+             (sunucuda olmasa da tıklanabilir profil linki olur). */
+          const ad = await kullaniciAdiBul(client, uid);
+          ownerLog(client, t("tr", "premium.sureDoldu", {
+            kullanici: ad || `<@${uid}>`,
+            id: uid
+          }));
           // Bitene DM ile haber ver (embed)
           try {
             const lang = (getLangSync(uid) || "tr");
@@ -729,6 +806,9 @@ module.exports = {
      bağımlılık kurmadan erişebilsin. */
   seviyeHedefi: (guild, kaynakKanal) => require("./komutlar/seviye-ayar").seviyeHedefi(guild, kaynakKanal),
   seviyeAyari: (guildId) => require("./komutlar/seviye-ayar").ayarAl(guildId),
+  /* Discord ID → görünen ad (önbellek → Discord API → Firestore users).
+     Sunucuda olmayan kişiler için de çalışır. */
+  kullaniciAdiBul,
   DESTEK,
   SITE_MAGAZA,
   satisDuyuruSatir,
