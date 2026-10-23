@@ -1173,6 +1173,39 @@ async function _hedefCoz(ham) {
     if (tam) return tam;
   }
 
+  /* ── 1b) DÜZ AD ile YEREL kayıt araması ──────────────────────────────────
+     ÖLÇÜLEN HATA (2026-10-24, canlı ölçüm):
+         POST /friends/request  to="ahmetbs"  -> 404 "kullanıcı bulunamadı"
+     Halbuki "ahmetbs" o hesabın KENDİ kullanıcı adıydı ve `rbetiket_`
+     kaydı da vardı. Sebep: `_etiketBul(duzAd)` burada HİÇ ÇAĞRILMIYORDU;
+     düz ad doğrudan Discord cache'ine gidiyordu. Render'daki bot her
+     kullanıcıyı cache'te tutmadığı için (kullanıcı botla hiç
+     etkileşmemişse hiç yoktur) sonuç 404 oluyordu.
+
+     Bot'un kendi veritabanında `rbetiket_<id>` {tag, ad, no} olarak
+     durduğu için oradaki ada bakmak yeterli ve Discord'a hiç gitmeden
+     çözülür. TAM eşleşme (büyük/küçük harf duyarsız) uygulanır. */
+  try {
+    const tumKayit = db.all() || {};
+    const hedefKucuk = isim.toLowerCase();
+    for (const k of Object.keys(tumKayit)) {
+      if (!k.startsWith("rbetiket_")) continue;
+      const v = tumKayit[k];
+      if (!v) continue;
+      const kayitAd = _etiketTemizle(v.ad || "").toLowerCase();
+      const kayitTag = String(v.tag || "");
+      const tagIsim = kayitTag.split("#")[0].toLowerCase();
+      if (kayitAd === hedefKucuk || tagIsim === hedefKucuk) {
+        return {
+          id: k.slice("rbetiket_".length),
+          tag: kayitTag,
+          ad: v.ad || isimHam,
+          gecici: false
+        };
+      }
+    }
+  } catch { /* db okunamazsa Discord yoluna devam */ }
+
   /* 2) Sonra Discord: önce önbellek, sonra sunucu üyeleri. */
   let bulunan = null;
   try {
