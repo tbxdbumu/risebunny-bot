@@ -870,9 +870,9 @@ app.post("/api/public/delete", express.json({ limit: "64kb" }), (req, res) => {
 });
 
 /* POST /api/public/edit  { configId, discordId, name?, description? } → sahip/yetkili. */
-app.post("/api/public/edit", express.json({ limit: "64kb" }), (req, res) => {
+app.post("/api/public/edit", express.json({ limit: "1mb" }), (req, res) => {
   try {
-    const configId = String(req.body?.configId || req.body?.id || "").slice(0, 40);
+    const configId = String(req.body?.configId || req.body?.id || req.body?.profileId || "").slice(0, 40);
     const discordId = String(req.body?.discordId || "").replace(/\D/g, "").slice(0, 20);
     if (!configId || !discordId) return res.status(400).json({ error: "eksik alan" });
     if (!_ticketIzinli(req, res, discordId)) return;
@@ -883,13 +883,46 @@ app.post("/api/public/edit", express.json({ limit: "64kb" }), (req, res) => {
     if (String(cfg.discordId) !== discordId && String(discordId) !== String(U.SAHIP_ID)) {
       return res.status(403).json({ error: "yalnızca sahip düzenleyebilir" });
     }
+    /* ÖLÇÜLEN HATA (2026-10-23, kullanıcı bildirimi):
+         "config yayınladım, sonra ayar değiştirdim, UPDATE'e basınca
+          successful diyor ama hiçbir şey değişmiyor"
+       Kök neden tam olarak buradaydı: handler yalnızca `name` ve
+       `description` okuyordu. İstemci (DiscordPublicProfileStore.editProfile
+       -> RisebunnyApi.publicConfigDuzenle) güncel içeriği `data` alanında
+       BASE64 gönderiyordu; sunucu bu alanı hiç okumadan `ok:true` dönüyordu.
+       Artık:
+         1) `data` geldiyse içerik yazılır -> gerçek güncelleme
+         2) `data` yok/boş ise içeriğe DOKUNULMAZ (kısmi güncelleme)
+         3) her yazımda `guncellendi` tazelenir
+         4) gövde limiti 64kb -> 1mb (upload ucuyla aynı). 64kb büyük profil
+            payload'ında sessiz 413 üretiyordu. */
     const ad = String(req.body?.name || "").trim().slice(0, 48);
     const not = String(req.body?.description || "").trim().slice(0, 256);
     if (ad.length >= 3) cfg.ad = ad;
     if (req.body?.description !== undefined) cfg.not = not;
+    const hamIcerik = req.body?.data;
+    let icerikYazildi = false;
+    if (typeof hamIcerik === "string" && hamIcerik.length > 0 && hamIcerik.trim() !== "null") {
+      const yeni = hamIcerik.trim();
+      if (yeni.length > 4 && /^[A-Za-z0-9+/=\r\n]+$/.test(yeni)) {
+        if (String(cfg.icerik || "") !== yeni) {
+          cfg.icerik = yeni;
+          cfg.boyut = yeni.length;
+          cfg.guncelleyen = discordId;
+          icerikYazildi = true;
+        }
+      } else {
+        return res.status(400).json({ error: "geçersiz içerik (base64 bekleniyor)" });
+      }
+    }
+    if (!cfg.at) cfg.at = Date.now();
+    cfg.guncellendi = Date.now();
     kaydetListe(liste);
-    res.json({ ok: true, id: configId, name: cfg.ad, description: cfg.not || "" });
-  } catch { res.status(500).json({ error: "hata" }); }
+    res.json({
+      ok: true, id: configId, name: cfg.ad, description: cfg.not || "",
+      icerikYazildi, boyut: Number(cfg.boyut) || 0, guncellendi: cfg.guncellendi
+    });
+  } catch (e) { res.status(500).json({ error: "hata", detay: String((e && e.message) || e).slice(0, 120) }); }
 });
 
 function _premiumJson(id) {
@@ -1002,6 +1035,65 @@ function _etiketBul(ham) {
   } catch { return null; }
 }
 
+/* ── Hedef cozumleme: DUNDEN ONCE KAYITLI OLMASI GEREKMEZ ───────────────
+   OLCULEN HATA (2026-10-23, kullanici bildirimi: "arkadas davet ekleme
+   calismiyor"):
+     `rbetiket_<id>` kaydi YALNIZCA `_etiketAta(id)` icinde olusuyor ve
+     `_etiketAta` sadece KISININ KENDISI hakkinda cagriliyor (state /
+     presence / dogrula). Sonuc: A kullanicisi B'ye istek atmak istediginde
+     B daha once Vape'e hic girmemisse `rbetiket_<B>` yoktur ->
+     `_etiketBul` null doner -> `/api/friends/request` 404
+     "kullanıcı bulunamadı" verir. Yani istek "hic calismiyor" gorunur.
+
+   Cozum: once yerel kayitlara bak (hizli yol, davranis aynen korunur),
+   bulunamazsa Discord'dan coz. Side-effect YOK: bu fonksiyon yalnizca
+   okur; `rbetiket_` yazimi hala `_etiketAta`'nin isidir, boylece etiket
+   numaralari (kisisel, degistirilemez) korunur. */
+async function _hedefCoz(ham) {
+  const hizli = _etiketBul(ham);
+  if (hizli) return hizli;
+  const s = String(ham || "").trim();
+  if (!s) return null;
+  /* Ham Discord ID: kayit yoksa bile kullanici gercekten var mi Discord'dan
+     dogrula. Yoksa uydurma bir ID ile "arkadas" eklenmesin. */
+  if (/^\d{15,20}$/.test(s)) {
+    const u = await client.users.fetch(s).catch(() => null);
+    if (!u) return null;
+    return { id: s, tag: `${_etiketTemizle(u.username)}#${s.slice(-4)}`, ad: _etiketTemizle(u.username), gecici: true };
+  }
+  const m = s.match(/^(.+)#(\d{4})$/);
+  if (!m) return null;
+  const isim = m[1].replace(/^@/, "").trim().toLowerCase();
+  const numara = m[2];
+  /* Discord'da "#1234" artik gercek bir ayirici degil (yeni kullanici adlari
+     boyle bir sonek tasimaz); Vape etiketi kendi urettigi 4 haneli numaradir.
+     Discord kullanicisini ada gore bulan resmi bir uc yok, bu yuzden once
+     onbellege (guild uyeleri) bakilir. */
+  let bulunan = null;
+  try {
+    for (const [, kisi] of client.users.cache) {
+      const temiz = _etiketTemizle(kisi.username).toLowerCase();
+      if (temiz === isim) { bulunan = kisi; break; }
+    }
+    if (!bulunan) {
+      for (const [, guild] of client.guilds.cache) {
+        const uyeler = await guild.members.fetch({ query: m[1].replace(/^@/, "").trim(), limit: 5 }).catch(() => null);
+        if (!uyeler || !uyeler.size) continue;
+        bulunan = uyeler.first().user;
+        break;
+      }
+    }
+  } catch { bulunan = null; }
+  if (!bulunan) return null;
+  return {
+    id: String(bulunan.id),
+    tag: `${_etiketTemizle(bulunan.username)}#${numara}`,
+    ad: _etiketTemizle(bulunan.username),
+    gecici: true
+  };
+}
+
+
 /* ── Vape arkadaşlık sistemi (bot destekli) ────────────────────────────
    - POST /api/friends/request {from, to} → istek (to: etiket ya da ID)
    - GET  /api/friends/state?discordId= → {friends, incoming, outgoing}
@@ -1054,7 +1146,10 @@ function _cevrimiciMi(id) {
 app.post("/api/friends/request", express.json({ limit: "16kb" }), async (req, res) => {
   try {
     const from = String(req.body?.from || req.body?.discordId || "").replace(/\D/g, "").slice(0, 20);
-    const hedef = _etiketBul(req.body?.to);
+    /* Ölçülen hata (2026-10-23): burada `_etiketBul` vardı; hedef daha önce
+       Vape'e girmemişse 404 "kullanıcı bulunamadı" dönüyordu. `_hedefCoz`
+       önce yerel kayda bakıp sonra Discord'dan çözüyor (bkz. tanımı). */
+    const hedef = await _hedefCoz(req.body?.to);
     if (!from || from.length < 15) return res.status(400).json({ error: "geçersiz discordId" });
     if (!_ticketIzinli(req, res, from)) return;
     if (!hedef) return res.status(404).json({ error: "kullanıcı bulunamadı" });
@@ -1067,6 +1162,19 @@ app.post("/api/friends/request", express.json({ limit: "16kb" }), async (req, re
       return res.status(400).json({ error: "istek zaten gönderilmiş" });
     }
     const gonderen = _etiketAta(from) || { tag: from };
+    /* Ölçülen eksik (2026-10-23): hedefin `rbetiket_<id>` kaydı yoksa,
+       kabul eden taraf `_etiketAta(id)` çağrısında Discord'dan adını
+       alamıyor ve arkadaş listesinde yalnızca ID görünüyordu. İstek
+       anında hedefe etiket ata (kayıt `rbetiket_` altında kalır, yani
+       numara gerçek kişiye bağlanır) — istek göndermek Discord'dan
+       doğrulanmış bir kullanıcıya bağlanmış demektir. */
+    if (!db.get(`rbetiket_${hedef.id}`)) {
+      if (hedef.gecici) {
+        try { db.set(`rbetiket_${hedef.id}`, { tag: hedef.tag, ad: hedef.ad, no: String(hedef.tag).split("#").pop(), at: Date.now() }); } catch {}
+      } else {
+        _etiketAta(hedef.id);
+      }
+    }
     bekleyen.push({ from, tag: String(gonderen.tag || from), ad: String(gonderen.ad || ""), at: Date.now() });
     _istekKaydet(hedef.id, bekleyen);
     /* Gönderen tarafı: kendi "giden istekler" listesine yaz (state -> outgoing) */
@@ -1152,18 +1260,37 @@ app.post("/api/friends/respond", express.json({ limit: "16kb" }), async (req, re
 app.post("/api/friends/cancel", express.json({ limit: "16kb" }), async (req, res) => {
   try {
     const id = String(req.body?.discordId || "").replace(/\D/g, "").slice(0, 20);
-    const hedef = _etiketBul(req.body?.to);
     if (!id || id.length < 15) return res.status(400).json({ error: "eksik alan" });
     if (!_ticketIzinli(req, res, id)) return;
-    if (hedef) {
-      _istekKaydet(hedef.id, _istekListe(hedef.id).filter(b => String(b.from) !== id));
-      _gidenSil(id, hedef.id);
+    /* ÖLÇÜLEN HATA (2026-10-23): burada da `_etiketBul` vardı. Hedef
+       çözülemediğinde `else` dalı çalışıp TÜM giden istekleri siliyordu
+       ("yarım kalmasın" güvencesi) — yani A'ya gönderilmiş istek, B'yi geri
+       çekmeye çalışınca da siliniyordu. Artık:
+         1) `to` bir Discord ID ise doğrudan onu kullan (çözümleme gerekmez)
+         2) etiketse önce yerel kayıt, sonra Discord (yan etkisiz)
+         3) hâlâ çözülemezse yalnızca YEREL giden kayıtta birebir eşleşen
+            girdiyi düşür; diğer isteklere dokunma. */
+    let hedefId = null;
+    const ham = String(req.body?.to || req.body?.id || "").trim();
+    if (/^\d{15,20}$/.test(ham)) {
+      hedefId = ham;
     } else {
-      /* Etiket çözülemezse (isim değişti vb.) tüm giden kayıtları temizle:
-         yarım kalmış kayıt kullanıcıyı "istek zaten gönderilmiş"e kilitler. */
+      const cozulen = await _hedefCoz(ham);
+      if (cozulen) hedefId = cozulen.id;
+    }
+    if (hedefId) {
+      _istekKaydet(hedefId, _istekListe(hedefId).filter(b => String(b.from) !== id));
+      _gidenSil(id, hedefId);
+    } else if (ham) {
+      /* Aynı etiketi taşıyan giden kaydı bul (isim değişmiş olabilir). */
+      const kalan = _gidenListe(id).filter(g =>
+        String(g.tag || "").toLowerCase() !== ham.toLowerCase() &&
+        String(g.id) !== ham);
+      _gidenKaydet(id, kalan);
+    } else {
       _gidenKaydet(id, []);
     }
-    res.json({ ok: true });
+    res.json({ ok: true, hedef: hedefId });
   } catch { res.status(500).json({ error: "hata" }); }
 });
 app.post("/api/friends/remove", express.json({ limit: "16kb" }), async (req, res) => {  try {
@@ -1246,15 +1373,19 @@ app.post("/api/party/create", express.json({ limit: "16kb" }), (req, res) => {
     res.json({ ok: true, party: _partiOzet(p) });
   } catch { res.status(500).json({ error: "hata" }); }
 });
-app.post("/api/party/invite", express.json({ limit: "16kb" }), (req, res) => {
+app.post("/api/party/invite", express.json({ limit: "16kb" }), async (req, res) => {
   try {
     const id = String(req.body?.discordId || "").replace(/\D/g, "").slice(0, 20);
-    const hedef = _etiketBul(req.body?.to);
     if (!id || id.length < 15) return res.status(400).json({ error: "geçersiz discordId" });
     if (!_ticketIzinli(req, res, id)) return;
     const p = _partimNerede(id);
     if (!p) return res.status(400).json({ error: "parti yok" });
     if (String(p.leader) !== id) return res.status(403).json({ error: "sadece lider davet eder" });
+    /* ÖLÇÜLEN HATA (2026-10-23): burada `_etiketBul` vardı; davet edilen
+       kişi daha önce Vape'e girmemişse 404 "kullanıcı bulunamadı" ->
+       "parti daveti çalışmıyor". `_hedefCoz` önce yerel kayda bakar,
+       bulamazsa Discord'dan çözer (yan etkisiz). */
+    const hedef = await _hedefCoz(req.body?.to);
     if (!hedef) return res.status(404).json({ error: "kullanıcı bulunamadı" });
     if (String(hedef.id) === id) return res.status(400).json({ error: "kendini davet edemezsin" });
     if (p.members.some(m => String(m) === String(hedef.id))) return res.status(400).json({ error: "zaten partide" });
