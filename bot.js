@@ -171,6 +171,51 @@ const app = express();
 
 app.get("/", (req, res) => { console.log("RiseBunny pinglendi."); res.sendStatus(200); });
 
+/* ─────────────────────────────────────────────────────────────────────────
+ * Discord kimliği: görünen ad + avatar (TEK kaynak)
+ * ─────────────────────────────────────────────────────────────────────────
+ * ÖLÇÜLEN HATA (2026-10-23, Vape Online ekran görüntüsü):
+ *   Profilde kullanıcının gerçek Discord avatarı yerine identicon,
+ *   adı yerine eski/yanlış ad görünüyordu.
+ *
+ * Neden:
+ *   1) avatar yalnızca `client.users.cache.get(id)?.displayAvatarURL()`
+ *      ile alınıyordu. Bot yeniden başlayınca cache boşalır → avatar NULL
+ *      döner → istemci identicon çizer. Oysa hemen üstündeki satırlarda
+ *      username için `client.users.fetch(id)` YEDEĞİ vardı; avatar için yoktu.
+ *   2) `username` kullanılıyordu, `global_name` (Discord'da görünen ad) değil.
+ *      Kullanıcı sunucuda "AHMET" görünürken profilde "ahmetbs" çıkıyordu.
+ *
+ * Çözüm: cache → fetch yedeği, global_name önceliği, boyutlu CDN URL'i.
+ * Kararlı imza: her çağrıda aynı adı döndürür (arkadaş eşleşmesi buna bağlı).
+ * ───────────────────────────────────────────────────────────────────────── */
+async function _discordKimlik(id) {
+  const temiz = String(id || "").replace(/\D/g, "");
+  if (!temiz) return { username: null, globalName: null, displayName: null, avatar: null };
+  let u = client.users.cache.get(temiz) || null;
+  if (!u) {
+    try { u = await client.users.fetch(temiz).catch(() => null); } catch { u = null; }
+  }
+  if (!u) {
+    /* Fetch de başarısız (bot Discord'a erişemiyor olabilir): son bilinen ad. */
+    const kayit = db.fetch(`kayit_${temiz}`) || null;
+    return {
+      username: (kayit && kayit.ad) || null,
+      globalName: null,
+      displayName: (kayit && kayit.ad) || null,
+      avatar: null
+    };
+  }
+  const gn = u.global_name || null;
+  return {
+    username: u.username || null,
+    globalName: gn,
+    displayName: gn || u.username || null,
+    /* 128px PNG: arayüzde 10-15pt çiziliyor, tam boy 1024px gereksiz. */
+    avatar: u.displayAvatarURL ? u.displayAvatarURL({ extension: "png", size: 128 }) : null
+  };
+}
+
 const cors = require("cors");
 app.use("/api/leaderboard", cors({
   origin: ["https://risebunny.vercel.app", "http://localhost:3000"],
@@ -326,8 +371,12 @@ app.get("/api/user/:id", _botAuth, async (req, res) => {
     if (!username) {
       try { username = (await client.users.fetch(id).catch(() => null))?.username || null; } catch {}
     }
+    const kimlik = await _discordKimlik(id);
     res.json({
-      id, username,
+      id, username: kimlik.displayName || username,
+      avatar: kimlik.avatar,
+      globalName: kimlik.globalName,
+      avatarUrl: kimlik.avatar,
       wallet, bank, total: wallet + bank,
       xp, level: U.xpSeviye(xp),
       premium: { active: U.isPremium(id), daysLeft: prem > Date.now() ? Math.ceil((prem - Date.now()) / 86400000) : 0 },
@@ -872,7 +921,9 @@ app.post("/api/public/delete", express.json({ limit: "64kb" }), (req, res) => {
 /* POST /api/public/edit  { configId, discordId, name?, description? } → sahip/yetkili. */
 app.post("/api/public/edit", express.json({ limit: "1mb" }), (req, res) => {
   try {
-    const configId = String(req.body?.configId || req.body?.id || req.body?.profileId || "").slice(0, 40);
+    const configId = String(
+      req.body?.configId || req.body?.id || req.body?.profileId || ""
+    ).slice(0, 40);
     const discordId = String(req.body?.discordId || "").replace(/\D/g, "").slice(0, 20);
     if (!configId || !discordId) return res.status(400).json({ error: "eksik alan" });
     if (!_ticketIzinli(req, res, discordId)) return;
@@ -900,7 +951,17 @@ app.post("/api/public/edit", express.json({ limit: "1mb" }), (req, res) => {
     const not = String(req.body?.description || "").trim().slice(0, 256);
     if (ad.length >= 3) cfg.ad = ad;
     if (req.body?.description !== undefined) cfg.not = not;
-    const hamIcerik = req.body?.data;
+    /* ── İçerik alanı adı: İKİ İSİM DE KABUL ────────────────────────────
+       ÖLÇÜLEN HATA (2026-10-23, kullanıcı: "config update bozuk"):
+       İstemci güncel içeriği `profileData` alanında gönderiyor
+       (PublicProfilePartialJsonPayloadBuilder:33 →
+        payload.add("profileData", profileData)),
+       sunucu ise yalnızca `data` arıyordu. Alan hiç buluşmadığı için
+       `icerikYazildi=false` ile `ok:true` dönüyordu: "başarılı" diyor ama
+       hiçbir şey değişmiyordu.
+       Artık `profileData` (istemcinin gerçek adı) ve `data` (eski/uyum)
+       birlikte desteklenir. */
+    const hamIcerik = req.body?.profileData !== undefined ? req.body.profileData : req.body?.data;
     let icerikYazildi = false;
     if (typeof hamIcerik === "string" && hamIcerik.length > 0 && hamIcerik.trim() !== "null") {
       const yeni = hamIcerik.trim();
@@ -913,6 +974,16 @@ app.post("/api/public/edit", express.json({ limit: "1mb" }), (req, res) => {
         }
       } else {
         return res.status(400).json({ error: "geçersiz içerik (base64 bekleniyor)" });
+      }
+    } else if (hamIcerik && typeof hamIcerik === "object") {
+      /* JSON nesnesi geldiyse kanonik base64'e çevir (istemci bazı yollarda
+         nesneyi çözmeden gönderebiliyor). */
+      const b64 = Buffer.from(JSON.stringify(hamIcerik), "utf8").toString("base64");
+      if (String(cfg.icerik || "") !== b64) {
+        cfg.icerik = b64;
+        cfg.boyut = b64.length;
+        cfg.guncelleyen = discordId;
+        icerikYazildi = true;
       }
     }
     if (!cfg.at) cfg.at = Date.now();
@@ -1062,33 +1133,64 @@ async function _hedefCoz(ham) {
     return { id: s, tag: `${_etiketTemizle(u.username)}#${s.slice(-4)}`, ad: _etiketTemizle(u.username), gecici: true };
   }
   const m = s.match(/^(.+)#(\d{4})$/);
-  if (!m) return null;
-  const isim = m[1].replace(/^@/, "").trim().toLowerCase();
-  const numara = m[2];
-  /* Discord'da "#1234" artik gercek bir ayirici degil (yeni kullanici adlari
-     boyle bir sonek tasimaz); Vape etiketi kendi urettigi 4 haneli numaradir.
-     Discord kullanicisini ada gore bulan resmi bir uc yok, bu yuzden once
-     onbellege (guild uyeleri) bakilir. */
+  const duzAd = s.replace(/^@/, "").trim();
+  if (!m && !duzAd) return null;
+
+  /* ── Discord düz kullanıcı adı desteği ──────────────────────────────────
+     ÖLÇÜLEN HATA (2026-10-23, ekran görüntüsü): kullanıcı "ahmetbs#6079"
+     yazdı, istek hiç gitmedi (0 PENDING REQUESTS).
+     Neden: kodun tek kabul ettiği biçimler ham ID ve `isim#1234` idi; ikincisi
+     de VAPE ETİKETİ (kendi ürettiği 4 hane) sanılıyordu. Discord 2023'te
+     #1234 ayırıcısını kaldırdığı için kullanıcılar düz ad taşıyor:
+       - "ahmetbs"        → hiçbir dal eşleşmiyordu → null → 404
+       - "ahmetbs#6079"   → Vape etiketi sanılıp aranıyordu → 404
+     Çözüm: `#` sonrası rakam Vape etiketi olabilir AMA isim kısmı Discord
+     kullanıcı adı da olabilir; ikisini de dene. */
+  const isimHam = (m ? m[1] : duzAd).replace(/^@/, "").trim();
+  const numara = m ? m[2] : null;
+  const isim = isimHam.toLowerCase();
+  if (!isim) return null;
+
+  /* 1) Önce Vape etiketi (isim#numara birebir) — kullanıcının kendi numarası. */
+  if (numara) {
+    const tam = _etiketBul(`${isimHam}#${numara}`);
+    if (tam) return tam;
+  }
+
+  /* 2) Sonra Discord: önce önbellek, sonra sunucu üyeleri. */
   let bulunan = null;
   try {
     for (const [, kisi] of client.users.cache) {
-      const temiz = _etiketTemizle(kisi.username).toLowerCase();
-      if (temiz === isim) { bulunan = kisi; break; }
-    }
-    if (!bulunan) {
-      for (const [, guild] of client.guilds.cache) {
-        const uyeler = await guild.members.fetch({ query: m[1].replace(/^@/, "").trim(), limit: 5 }).catch(() => null);
-        if (!uyeler || !uyeler.size) continue;
-        bulunan = uyeler.first().user;
-        break;
-      }
+      const t1 = _etiketTemizle(kisi.username).toLowerCase();
+      const t2 = String(kisi.global_name || "").toLowerCase();
+      if (t1 === isim || t2 === isim) { bulunan = kisi; break; }
     }
   } catch { bulunan = null; }
+
+  if (!bulunan) {
+    try {
+      for (const [, guild] of client.guilds.cache) {
+        const uyeler = await guild.members.fetch({ query: isimHam, limit: 5 }).catch(() => null);
+        if (!uyeler || !uyeler.size) continue;
+        /* Arama bulanık: yalnızca TAM eşleşmeyi kabul et (yanlış kişiye
+           istek gitmesin). */
+        const tamEs = uyeler.find(k => {
+          const t1 = _etiketTemizle(k.user.username).toLowerCase();
+          const t2 = String(k.user.global_name || "").toLowerCase();
+          return t1 === isim || t2 === isim;
+        });
+        if (tamEs) { bulunan = tamEs.user; break; }
+      }
+    } catch { bulunan = null; }
+  }
+
   if (!bulunan) return null;
+  const gercekEtiket = _etiketAta(String(bulunan.id));
   return {
     id: String(bulunan.id),
-    tag: `${_etiketTemizle(bulunan.username)}#${numara}`,
-    ad: _etiketTemizle(bulunan.username),
+    /* Kendi Vape etiketi varsa onu kullan; yoksa geçici gösterim. */
+    tag: (gercekEtiket && gercekEtiket.tag) || `${_etiketTemizle(bulunan.username)}#${numero || String(bulunan.id).slice(-4)}`,
+    ad: bulunan.global_name || _etiketTemizle(bulunan.username),
     gecici: true
   };
 }
@@ -1673,17 +1775,21 @@ app.get("/api/kullanici/:id", async (req, res) => {
     const wallet = Number(db.fetch(`para_${id}`) || 0);
     const bank = Number(db.fetch(`bankapara_${id}`) || 0);
     const xp = Number(db.fetch(`xp_${id}`) || 0);
-    let username = client.users.cache.get(id)?.username || null;
-    if (!username) username = (await client.users.fetch(id).catch(() => null))?.username || null;
+    /* Discord kimliği TEK kaynaktan: cache → fetch yedeği, global_name önceliği.
+       Eski hâlde avatar yalnızca cache'e bakıyordu ve bot restart'ında NULL
+       dönüyordu (istemci identicon çiziyordu). */
+    const kimlik = await _discordKimlik(id);
     res.json({
-      id, username, wallet, bank, total: wallet + bank, xp, level: U.xpSeviye(xp),
+      id, username: kimlik.displayName, globalName: kimlik.globalName,
+      wallet, bank, total: wallet + bank, xp, level: U.xpSeviye(xp),
       premium: _premiumJson(id).premium, daysLeft: _premiumJson(id).daysLeft,
       /* Etiket burada da donuyor: client.js bu ucu /user/<id> olarak proxy'liyor
          ve istemci tarafi "vape online"daki isimle friends'takini karsilastiriyor.
          Ikisi ayni kaynaktan gelmeli, yoksa isim eslesmesi koptugu icin arkadas
          listesi hep bos kaldi. */
       tag: (_etiketAta(id) || {}).tag || null,
-      avatar: client.users.cache.get(id)?.displayAvatarURL?.({ extension: "png" }) || null,
+      avatar: kimlik.avatar,
+      avatarUrl: kimlik.avatar,
       pets: db.fetch(`pets_${id}`) || [], capes: db.fetch(`launcher_capes_${id}`) || []
     });
   } catch { res.status(500).json({ error: "hata" }); }
