@@ -825,11 +825,27 @@ app.get("/api/public/config/:id", (req, res) => {
 const _CFG_MAX_BOYUT = 512 * 1024;
 
 function _cfgKisa(c, dahilIcerik) {
+  /* OLÇÜLEN EKSİK (2026-10-24, canlı /public/mine yanıtı):
+     Yanıtta `sharerId` ve `sharerName` YOKTU; yalnızca `sharerAvatar`
+     dönüyordu:
+
+         {"id":"179270083736408013","name":"Bedwars2", ...,
+          "sharerAvatar":"https://cdn.discordapp.com/avatars/…"}
+
+     İstemci (Vape Online / yayınlanan config listesi) paylaşanın kimliğini
+     gösterebilmek için ID ve ADA da ihtiyaç duyar. Avatar'ı olan ama ID'si
+     olmayan bir kayıt, kullanıcıyı "kendi config'i mi başkasının mı"
+     ayrımından yoksun bırakıyor; profil kartında da ad boş kalıyor.
+
+     Artık her config kaydı paylaşanın discordId + username'ini de taşır. */
   const j = {
     id: String(c.id), name: c.ad || "config", description: c.not || "",
     status: c.durum || "bekliyor", reason: c.sebep || "",
     downloads: Number(c.indirme) || 0, votes: _cfgOylar(c).length,
-    createdAt: Number(c.at) || 0, sharerAvatar: _cfgAvatar(c)
+    createdAt: Number(c.at) || 0,
+    sharerId: String(c.discordId || ""),
+    sharerName: String(c.username || ""),
+    sharerAvatar: _cfgAvatar(c)
   };
   if (dahilIcerik) j.data = c.icerik;
   return j;
