@@ -1027,6 +1027,24 @@ function _istekListe(id) {
 function _istekKaydet(id, liste) {
   try { db.set(`arkadas_istek_${id}`, liste); } catch {}
 }
+/* Giden (gönderilmiş) istekler — `friends/state` içinde `outgoing` olarak
+   döner. Ayrı tutulur çünkü alıcının listesi (`arkadas_istek_<alici>`)
+   yalnızca alıcıya aittir; gönderen kendi tarafını buradan görür. */
+function _gidenListe(id) {
+  try {
+    const l = db.get(`arkadas_giden_${id}`);
+    return Array.isArray(l) ? l : [];
+  } catch { return []; }
+}
+function _gidenKaydet(id, liste) {
+  try { db.set(`arkadas_giden_${id}`, liste); } catch {}
+}
+function _gidenSil(id, hedef) {
+  try {
+    const kalan = _gidenListe(id).filter(g => String(g.id) !== String(hedef));
+    _gidenKaydet(id, kalan);
+  } catch {}
+}
 function _cevrimiciMi(id) {
   try {
     const p = db.get(`presence_${id}`);
@@ -1051,6 +1069,10 @@ app.post("/api/friends/request", express.json({ limit: "16kb" }), async (req, re
     const gonderen = _etiketAta(from) || { tag: from };
     bekleyen.push({ from, tag: String(gonderen.tag || from), ad: String(gonderen.ad || ""), at: Date.now() });
     _istekKaydet(hedef.id, bekleyen);
+    /* Gönderen tarafı: kendi "giden istekler" listesine yaz (state -> outgoing) */
+    const giden = _gidenListe(from).filter(g => String(g.id) !== String(hedef.id));
+    giden.push({ id: String(hedef.id), tag: String(hedef.tag || hedef.id), ad: String(hedef.ad || ""), at: Date.now() });
+    _gidenKaydet(from, giden);
     _dmBildir(hedef.id, "👥 Yeni arkadaşlık isteği",
       `**${gonderen.tag || from}** seni arkadaş olarak eklemek istiyor! Oyundaki Friend requests panelinden kabul edebilirsin. 🐰`).catch(() => {});
     res.json({ ok: true, to: hedef.tag });
@@ -1070,7 +1092,18 @@ app.get("/api/friends/state", async (req, res) => {
       from: String(b.from), tag: String(b.tag || b.from), ad: String(b.ad || ""), at: Number(b.at) || 0,
       online: _cevrimiciMi(String(b.from))
     }));
-    res.json({ ok: true, tag: String(ben.tag || id), friends, incoming, count: { friends: friends.length, incoming: incoming.length } });
+    /* ÖLÇÜLEN EKSİK (2026-10-23): yanıtta `outgoing` HİÇ yoktu. Sonuç:
+       kullanıcı gönderdiği isteği kendi listesinde göremiyordu; aynı kişiye
+       tekrar istek atınca 400 "istek zaten gönderilmiş" alıyor ve isteğin
+       gerçekten gittiğine dair hiçbir iz olmuyordu.
+       Giden istek `arkadas_giden_<id>` altında tutulur (request ucunda
+       yazılır, cancel/respond uçlarında silinir). */
+    const outgoing = _gidenListe(id).map(g => ({
+      id: String(g.id), tag: String(g.tag || g.id), ad: String(g.ad || ""), at: Number(g.at) || 0,
+      online: _cevrimiciMi(String(g.id))
+    }));
+    res.json({ ok: true, tag: String(ben.tag || id), friends, incoming, outgoing,
+      count: { friends: friends.length, incoming: incoming.length, outgoing: outgoing.length } });
   } catch { res.status(500).json({ error: "hata" }); }
 });
 app.post("/api/friends/respond", express.json({ limit: "16kb" }), async (req, res) => {
@@ -1110,6 +1143,8 @@ app.post("/api/friends/respond", express.json({ limit: "16kb" }), async (req, re
       _dmBildir(from, "✅ Arkadaşlık kabul edildi",
         `**${ben.tag}** isteğini kabul etti! Artık Vape arkadaşısınız. 🐰`).catch(() => {});
     }
+    /* Her iki durumda da gönderenin "giden istek" kaydı kapanır. */
+    _gidenSil(from, id);
     res.json({ ok: true, accept: kabul });
   } catch { res.status(500).json({ error: "hata" }); }
 });
@@ -1122,6 +1157,11 @@ app.post("/api/friends/cancel", express.json({ limit: "16kb" }), async (req, res
     if (!_ticketIzinli(req, res, id)) return;
     if (hedef) {
       _istekKaydet(hedef.id, _istekListe(hedef.id).filter(b => String(b.from) !== id));
+      _gidenSil(id, hedef.id);
+    } else {
+      /* Etiket çözülemezse (isim değişti vb.) tüm giden kayıtları temizle:
+         yarım kalmış kayıt kullanıcıyı "istek zaten gönderilmiş"e kilitler. */
+      _gidenKaydet(id, []);
     }
     res.json({ ok: true });
   } catch { res.status(500).json({ error: "hata" }); }
@@ -1133,6 +1173,10 @@ app.post("/api/friends/remove", express.json({ limit: "16kb" }), async (req, res
     if (!_ticketIzinli(req, res, id)) return;
     _arkadasKaydet(id, _arkadasListe(id).filter(a => String(a.id) !== hedef));
     _arkadasKaydet(hedef, _arkadasListe(hedef).filter(a => String(a.id) !== id));
+    /* Arkadaşlık kalkınca iki taraftaki yarım "giden istek" kayıtları da
+       silinir; aksi halde yeni istek 400 "istek zaten gönderilmiş" alırdı. */
+    _gidenSil(id, hedef);
+    _gidenSil(hedef, id);
     res.json({ ok: true });
   } catch { res.status(500).json({ error: "hata" }); }
 });
