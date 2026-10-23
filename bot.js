@@ -1080,7 +1080,19 @@ app.post("/api/friends/respond", express.json({ limit: "16kb" }), async (req, re
     const kabul = req.body?.accept === true || req.body?.accept === "true" || req.body?.accept === 1;
     if (!id || id.length < 15 || !from) return res.status(400).json({ error: "eksik alan" });
     if (!_ticketIzinli(req, res, id)) return;
-    const bekleyen = _istekListe(id).filter(b => String(b.from) !== from);
+    /* ÖLÇÜLEN HATA (2026-10-23): burada bekleyen istek KONTROL EDİLMİYORDU.
+       İstemci `friends/respond` çağrısını herhangi bir `from` ile yapabildiği
+       için, hiç istek gönderilmemiş bir hesap "kabul" diyerek karşı tarafı
+       zorla arkadaş yapabiliyordu (canlı testte HTTP 200 döndü, iki taraf da
+       arkadaş oldu). Arkadaşlık karşılıklı yazıldığı için bu, istek akışını
+       tamamen atlatıyordu.
+       Artık kabul yalnızca GERÇEKTEN bekleyen bir istek varsa geçerli. */
+    const gelen = _istekListe(id);
+    const eslesen = gelen.find(b => String(b.from) === from);
+    if (kabul && !eslesen) {
+      return res.status(404).json({ error: "bekleyen istek yok" });
+    }
+    const bekleyen = gelen.filter(b => String(b.from) !== from);
     _istekKaydet(id, bekleyen);
     if (kabul) {
       const ben = _etiketAta(id) || { tag: id, ad: "" };
