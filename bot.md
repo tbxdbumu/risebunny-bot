@@ -913,7 +913,6 @@ görünen ama hep boş dönen ölü kod. Silindi, yerine yorum bırakıldı.
 3. Araştırma gerekmiyorsa normal akış bozulmaz.
 
 ### 13.4 Ortam değişkenleri (hepsi opsiyonel)
-
 | Değişken | Varsayılan | Ne yapar |
 |----------|-----------|----------|
 | `AI_SICAKLIK` | `0.85` | Normal cevap sıcaklığı |
@@ -932,6 +931,150 @@ olarak çalıştırılamadı; akış sahte model ile (24 + 7 vaka) doğrulandı,
 toplama tarafı ise **gerçek ağla** (24 + 6 vaka) doğrulandı. Anahtar
 girildiğinde `degerlendir()` devreye girer; girilmezse `webSonuc.yeterli`
 hep `false` kalır ve bot eskisi gibi yedek sağlayıcılarla/devre dışı kalır.
+
+---
+
+## 14. Eşleştirici v3 — "tutarlı değil" hatasının kökü (2026-10)
+
+Kullanıcı canlıda 4 soru gönderdi ve hepsi bozuk geldi:
+
+| Soru | Gelen cevap | Doğrusu |
+|------|-------------|---------|
+| `rise wikipedia ne işe yarar` | "🏠 İnsanlara yardım edip onları eğlendirir..." | Wikipedia tanımı |
+| `rise açık kaynak nedir` | (boş / AI) | açık kaynak tanımı |
+| `rise saat kaçarmı hahha` | "Saat kaçmazki hasbxuanxqunausx" | saat |
+| `rise hile nedir` | "🏆 En iyi hile: Rubidium V4" | hile tanımı |
+
+Bunların hiçbiri rastgele değil — dördü de **aynı 3 kök hatadan** çıkıyor.
+Tek tek yama yapmak yerine kökü düzelttim.
+
+### 14.1 Kök hata #1 — Kapsam paydası çöp kelimelerle doluyordu
+
+`kelimeKapsami()` "kullanıcının kaç kelimesi tuttu / kaç kelime yazdı" oranı
+kullanıyor. Payda, `DURAK` (bilgi taşımayan kelime listesi) çıkarıldıktan
+sonra kalan kelimeler. O listede `ise`, `yarar`, `rise`, `hakkinda` **yoktu**:
+
+```
+"wikipedia ne işe yarar"    → payda [wikipedia, ise, yarar] → kapsam 0.50
+"rise premium ne işe yarar" → payda [rise, premium, ise, yarar] → 0.66
+"saat kaçarmı hahha"        → "hahha" paydada → tek bilgi kelimesi 0.33
+```
+
+Yani kullanıcı ne kadar doğal yazarsa kapsam o kadar düşüyordu. Bot "resmi
+cümle" bekliyordu.
+
+**Düzeltme:** `ise`, `yarar`, `fayda`, `rise`, `risebunny`, `hakkinda`,
+`bilgi`, `anlat`, `soyle`, `hocam`, `hahha`/`haha`/`xd`/`lol`… DURAK'a eklendi.
+
+> `rise` neden? Çünkü `rise` tetikleyici kelime. `rise vape ne işe yarar`
+> yazan kullanıcı "vape" hakkında soruyor; "rise" ayrı bir kavram değil.
+> Bu yüzden "vape nedir" kaydı artık bulunuyor (öncesi 0.40, eşiğin altı).
+
+### 14.2 Kök hata #2 — Tek kelime kalınca eşik bedava geçiliyordu
+
+"Soru kelimeleri" (nedir, ne, kim) çıkarılınca geriye tek kelime kalırsa
+kapsam **1.00** oluyor. `hile nedir` → `[hile]` → kapsam 1.00 → skor 0.76 →
+`en iyi hile nedir` cevabı.
+
+**Düzeltme:** tek kelime kaldığında, dokümanın ana sorusundaki bilgi
+kelimelerinin ne kadarının kullanıcıda olduğuna bakılır. Kullanıcı 2 kelimelik
+sorunun 1 kelimesini yazdıysa (oran 0.50) skor `0.45 + 0.55 × oran` ile
+çarpılır. `hile` ↔ `en iyi hile` → 0.76 → 0.44 (eşiğin altı) → AI devralır.
+
+### 14.3 Kök hata #3 — Türkçe ekler ayrı kelime sanılıyordu
+
+```
+"saat kaçarmı hahha" → sorguda [saat, kacarmi], dokümanda [saat]
+                     → kapsam 0.50 → skor 0.31 → bot SUSUYOR
+```
+
+`kok()` ek kırpması için kelimenin en az 3 harf bırakmasını istiyor;
+"kacarmi" kırpılmadığı için "kaç" ile ayrı kelime sayıldı. Oysa aynı kelimenin
+ekli hâli.
+
+**Düzeltme — iskelet eşleşmesi:** kelimelerin ünsüz iskeleti çıkarılır
+(`kok()` + ünlüleri at). "kaç" → `kc`, "kaçarmı" → `kcrm`. Uzun taraf kısanın
+devamıysa (ek yığılması) eşleşir.
+
+**Sıkı kural (ilk denemem yanlıştı):** ilk sürüm sadece "kısa, uzunun başı"
+diyordu ve şunları tutuyordu:
+- `yapabilirsin` (ypblrs) ↔ `yapabilirsiniz` (ypblrsnz) → **tek/çoğul birleşti**
+- `hava` (hv) ↔ `have` (hv) → **"bugun hava nasil" İngilizce "have" ile eşleşti**
+
+Doğrusu: uzun taraf **en az 2 karakter EK** almalı; kısa iskelet 6+ harfse
+**en az 3** (tekil/çoğul farkı reddedilir). En fazla 8.
+
+### 14.4 Kök hata #4 (yapısal) — Cevap metni eşleşme yüzeyi sayılıyordu
+
+`indeksOlustur()` doküman köklerini **sorulardan** kuruyordu — kod doğruydu.
+Ama `dok.kokler` adı "dokümanın tüm kelimeleri" gibi okunuyordu ve iki ayrı
+riski gizliyordu:
+
+1. Cevap metnindeki kelimeler gelecekte kolayca eşleşme yüzeyine sızabilir
+   (ör. `cf nedir` kaydının cevabında geçen kelimeler).
+2. Kapsam hesabı ile IDF hesabı aynı kümeden besleniyordu; ikisini ayırmak
+   imkânsızdı.
+
+**Düzeltme:** `soruKokleri` adında **ayrı** bir küme eklendi ve kapsam/IDF
+onun üzerinden yapılıyor. `kokler` geriye dönük uyumluluk için duruyor.
+
+### 14.5 Eksik kavram kayıtları
+
+Düzeltmelerden sonra bile `wikipedia ne işe yarar`, `açık kaynak nedir` ve
+`hile nedir` **katalogda yoktu**. Üç yeni kayıt eklendi (`cevaplar.json`
+159 → 163):
+
+- `[hile] hile nedir` (12 varyant) — hile tanımı + Rubidium/Vape gerçeği
+- `[genel] wikipedia ne işe yarar` (8 varyant)
+- `[genel] açık kaynak nedir` (8 varyant)
+- `[genel] yapay zeka nedir` (10 varyant)
+
+Ayrıca DB'deki öğrenilmiş kayıtlara (`ai_qa_`) 20 varyant eklendi:
+`hangi ai modelisin` ve `what ur model` — "senin ai modelin ne" yazınca
+"sahibin kim" cevabı dönüyordu.
+
+> **Önemli ayrım:** İlk 4 hata **kod** hatasıydı, sonrakiler **veri**
+> eksiğiydi. Veri eklemek kodu düzeltmez, kod düzeltmek veriyi yaratmaz.
+> İkisi ayrı ayrı yapıldı ki "hile nedir" yine "en iyi hile"ye kaymasın.
+
+### 14.6 Ölçüm
+
+Kullanıcının 4 sorusu:
+
+| Soru | Önce | Sonra |
+|------|------|-------|
+| `wikipedia ne işe yarar` | 0.32 (yanlış) | **0.685 → Wikipedia tanımı** |
+| `açık kaynak nedir` | 0 → boş | **1.000 → açık kaynak tanımı** |
+| `saat kaçarmı hahha` | 0.21 → susuyor | **1.000 → saat** |
+| `hile nedir` | 0.76 → "en iyi hile" | **0.839 → hile tanımı** |
+
+Tam katalog regresyonu (163 kayıt, 2499 soru kalıbı):
+
+| Ölçüm | Değer |
+|-------|-------|
+| Doğru cevap | **%95.3** (2382/2499) |
+| Yanlış | 47 — tamamı kardeş kayıt (aynı konu, ayrı dosya) |
+| Boş | 70 (yabancı soru → AI devralır, doğru davranış) |
+
+Tek kelime toleransı (`iskelet-risk.js`):
+
+```
+"kayıtlar nasıl"        → kayıt nasıl yapılır ✅
+"premiumlar ne işe yarar" → premiun ne işe yarar ✅   (hem ek hem yazım hatası)
+"vape'ler nedir"        → vape nedir ✅
+"saatler kaç"           → saat kaç ✅
+"hilеler ücretsiz mi"   → hangi hileler ücretsiz ✅
+"kuponlar nasıl kullanılır" → kupon nasıl kullanılır ✅
+```
+
+Yabancı 26 sorunun 5'i eşleşti, **5'i de doğru cevap** (sahibin onayladığı
+`owner_saved` kayıtları: hava durumu "bilmiyorum" cevabı, HTML örneği…).
+
+### 14.7 Bu turda dokunulmayan
+
+`senin ai modelin ne` gibi sorular "sahibin kim" ile yarışıyordu; DB'ye
+varyant eklendi, düzeldi. `bot musun` gibi çok kısa sorular hâlâ komşu kayda
+(`bot kim`) gidebiliyor — ikisi de aynı cevabı veriyor, zararsız.
 
 ---
 

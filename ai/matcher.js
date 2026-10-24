@@ -279,8 +279,7 @@ function genislet(tokens) {
  * Sorgunun tamamı bunlardan oluşuyorsa (örn. "nasılsın") tekrar kullanılır,
  * böylece "nasılsın" gibi tamamen selamlama sorguları cevapsız kalmaz.
  */
-const DURAK = new Set([
-  "bir", "ve", "ile", "mi", "mu", "mı", "mü", "ne", "bu", "su", "da", "de", "ki", "ya", "ama",
+const DURAK = new Set([  "bir", "ve", "ile", "mi", "mu", "mı", "mü", "ne", "bu", "su", "da", "de", "ki", "ya", "ama",
   "cok", "az", "icin", "gibi", "kadar", "daha", "var", "yok", "ise", "olarak", "olan", "olur",
   "nasil", "neden", "nicin", "neler", "nelerdir", "nedir", "nerede", "nereden", "nasilsin",
   "the", "a", "an", "is", "are", "to", "of", "in", "on", "for", "and", "or", "do", "does",
@@ -300,12 +299,135 @@ const DURAK = new Set([
   "whats", "which", "who", "whom", "whose", "when", "tell", "about", "there",
   "is", "was", "were", "be", "am", "this", "that", "these", "those",
   "please", "pls", "plz", "hey", "hi", "hello",
+  /* ── v3: İŞLEV KELİMELERİ (BÜYÜK HATA KAYNAĞI) ──
+     Bunlar bilgi taşımaz ama kapsam paydasına giriyordu. Sonuç: eşleştirici
+     içi boş kelimelerle dolup gerçek eşleşmeyi kaçırıyordu.
+
+       "wikipedia ne işe yarar"  → payda [wikipedia, ise, yarar] → kapsam 0.50
+       "rise premium ne işe yarar" → payda [rise, premium, ise, yarar] → 0.66
+       "hile nedir"              → "hile" TEK kalıyor → kapsam 1.00 → "en iyi hile"
+
+     "ne işe yarar" bir SORU KALIBI, bilgi değil. "isе" listede yoktu.
+     Aynı şekilde "rise" markanın parçası, ayrı bir kavram değil; kullanıcı
+     "rise vape ne işe yarar" yazıp "vape nedir" kaydını bulamıyordu. */
+  "ise", "yarar", "yararsin", "yararli", "fayda", "faydasi", "faydali",
+  "rise", "reyz", "risebunny", "hakkinda", "bilgi", "anlat", "soyle",
+  "lutfen", "abi", "kardes", "kanka", "knk", "ya", "yani", "iste", "hocam",
+  "does", "do", "use", "used", "works", "work", "mean", "means", "about", "info",
+  /* Dolgu seslenmeleri: "saat kaçarmı hahha" → "hahha" paydaya giriyordu
+     ve tek bilgi kelimesi "saat"in kapsamını 0.33'e düşürüyordu. */
+  "hahha", "haha", "hehe", "hihi", "xd", "xdd", "lol", "kekw", "asd", "asdf",
 ]);
 
 function tokenizeFull(text) {
   return normalize(text)
     .split(/\s+/)
     .filter(t => t.length > 0);
+}
+
+/**
+ * v3: KELİME İSKELETİ — ünsüzleri tut, ünlüleri at ("saat kaç" gibi).
+ *
+ * Neden: Türkçe'de asıl işlevi taşıyan şey kelimenin GÖVDESİ ("saat kaç-").
+ * Ekler ("kaçarmı", "kaçta", "kaçtır", "kacta") kullanıcıdan kullanıcıya
+ * değişiyor ve kelimenin kendisi gibi davranıyordu. Sonuç:
+ *   "saat kaçarmı hahha" → sorguda [saat, kacarmi], dokümanda [saat]
+ *   → kapsam 0.50 → skor 0.31 → bot susuyor.
+ * Oysa kullanıcı saat soruyor.
+ *
+ * Çözüm: `kelimeIskelesi` ekleri kırpar VE ünlüleri atar; "kacarmi"/"kac" aynı
+ * iskelete ("kc") iner. Bu yalnızca EK/çekim toleransı içindir; asıl kapsam
+ * hesabı hâlâ tam bicimlerle yapılır, böylece iskelet benzerliği tek başına
+ * cevap üretmez.
+ */
+const UNLU = /[aeıioöuüâîû]/g;
+function kelimeIskelesi(kelime) {
+  const g = kok(String(kelime || ""));
+  const isk = g.replace(UNLU, "");
+  return isk.length >= 2 ? isk : g;
+}
+
+/**
+ * İskelet eşleşmesi — "kaçarmı" ("kcrm") iskeleti "kaç"ınkiyle ("kc") başlıyor.
+ *
+ * Neden ön ek: `kok()` ek kırpma için kelimenin en az 3 harf bırakmasını
+ * istiyor (kelimeIskelesi → `kok`); "kacarmi" kırpılamadığı için iskeleti
+ * "kcrm" çıkıyor. Anahtar kelime "kac"ın iskeleti ise "kc". Tam eşitlik
+ * aradığımızda hiç tutmuyordu. Ön ek karşılaştırması Türkçe ek yığılmasını
+ * doğal olarak tolere eder ("saatte", "saatten", "kaçarmı", "kaçtır").
+ *
+ * Yanlış eşleşme koruması: en az 2 harf ve iki taraftan biri kısa olmalı
+ * (uzun iskeletler "kcrm" ↔ "kc" gibi tek yönlü ön ek olur, "abc" ↔ "abd"
+ * gibi alakasız çiftler tutmaz).
+ */
+function iskeletTutar(a, b) {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const kisa = a.length <= b.length ? a : b;
+  const uzun = a.length <= b.length ? b : a;
+  if (kisa.length < 2) return false;
+  /* v3.1 — SIKI KURAL (false positive düzeltmesi):
+     Eski hâli sadece "kısa, uzunun başı" diyordu. Sonuç felaketti:
+       "yapabilirsin" (ypblrs) ↔ "yapabilirsiniz" (ypblrsnz) → TUTUYORDU
+       "hava" (hv) ↔ "have" (hv) → TUTUYORDU
+     Yani "bugun hava nasil" sorusu İngilizce "have" kelimesi üzerinden
+     eşleşebiliyordu. Tek harf farkı artık EŞLEŞME DEĞİL — o değişiklik
+     anlamı değiştirir (tekil/çoğul, -siz/-li).
+
+     Ek yığılması ise EKLEMEDİR: uzun taraf kısanın devamı olacak.
+     Ölçüt: en az 2 karakter EK; kısa iskelet 6+ harfse en az 3 (tekil/çoğul
+     farkı "ypblrs" ↔ "ypblrsnz" ek 2 → reddedilir). En fazla 8 (daha uzun
+     "ek" artık farklı kelimedir).
+       "kac"  (kc)   ↔ "kacarmi" (kcrm)   ek 2 ✅
+       "kayit"(kyt)  ↔ "kayitlar" (kytlr) ek 2 ✅
+       "hava" (hv)   ↔ "have" (hv)        aynı boy ❌
+       "ypblrs"      ↔ "ypblrsnz"         ek 2, 6 harf → ❌ */
+  const ek = uzun.length - kisa.length;
+  const gerekliEk = kisa.length >= 6 ? 3 : 2;
+  if (ek < gerekliEk) return false;
+  return uzun.startsWith(kisa) && ek <= 8;
+}
+
+/**
+ * İskelet kümesi.
+ *
+ * DİKKAT: Burada DURAK filtresi UYGULANMAZ. "saat kaç" sorusunun bilgi
+ * kelimesi sadece "saat" (çünkü "kaç" DURAK'ta), iskeleti de "st" olurdu ve
+ * "kaçarmı" (iskelet "kcrm") asla eşleşmezdi. Hâlbuki "kaç" tam olarak
+ * kullanıcının yazdığı ekli kelimenin gövdesi. Bu yüzden tüm kelimelerin
+ * iskeleti alınır; kapsam paydası yine DURAK filtreli kalır.
+ */
+function iskelet(text) {
+  const set = new Set();
+  for (const w of tokenizeFull(text)) {
+    if (w.length < 2) continue;
+    set.add(kelimeIskelesi(w));
+  }
+  return set;
+}
+
+/* ─────────────────────────────── CEVAP KAYNAĞI ─────────────────────────────── */
+/**
+ * v3 — KRİTİK KÖK NEDEN (kullanıcı bildirimi, canlı):
+ *
+ *   "rise hile nedir" → "🏆 En iyi hile: Rubidium V4"
+ *   "rise saat kaçarmı" → "Saat kaçmazki hasbxuanxqunausx"
+ *
+ * Bot "hile" kelimesini SORU kelimesi olarak değil, CEVAP metninde geçtiği
+ * için dokümana ekliyordu. Somut kanıt: `cf nedir` kaydının (yazı tura
+ * komutu!) kök listesinde "hile" var, çünkü cevabında "kaybetme riskini"
+ * benzeri bir cümle geçiyor. Yani "hile nedir" sorusu yazı tura komutuna
+ * eşleşiyordu.
+ *
+ * Eski davranış `dok.kokler` üzerinden kuruluyordu; o küme TÜM alanları
+ * (sorular + cevap + cevap_en) kapsıyor. Bir soru, ancak kelime KULLANICI
+ * SORUSUNDA geçiyorsa eşleşmelidir. Cevap metni eşleşme yüzeyi değildir.
+ *
+ * Bu yüzden kapsam/IDF hesabı artık `dok.soruKokleri` üzerinden yapılır.
+ * `dok.kokler` (sorular + cevap) yalnızca yedek olarak duruyor.
+ */
+function soruKokleri(dok) {
+  return dok.soruKokleri || dok.kokler;
 }
 
 /**
@@ -335,20 +457,45 @@ function kokler(text, genisletMi = true) {
  * Burada her kelime BİR kez değerlendirilir: tam hali VEYA sıyrılmış hali
  * dokümanda geçiyorsa o kelime "tuttu" sayılır.
  *
- * @returns {{tutulan:number, toplam:number, oran:number}}
+ * v3 — ORAN DEĞİL, TUTAN SAYI DA BELİRLENİMCİ:
+ * "hile nedir" sorgusunun soru kelimeleri çıkarılınca TEK kelime ("hile")
+ * kalıyor ve kapsam 1.00 oluyordu → "en iyi hile nedir" cevabı dönüyordu.
+ * Ama kullanıcı "hile nedir" diye sordu, "en iyi hile hangisi" diye değil.
+ * Bu ayrımı yapmak için `tutulan` (kaç bilgi kelimesi tuttu) da dönülür.
+ *
+ * @returns {{tutulan:number, toplam:number, oran:number, guclu:boolean}}}
+ *   guclu: gevşetmeden (bilgi kelimesi) sayıldı mı — DURAK'a düşülerek
+ *   hesaplanan zayıf kapsamları ayırt etmek için.
  */
-function kelimeKapsami(text, dokKokleri) {
+function kelimeKapsami(text, dokKokleri, dokIskeletleri = null) {
   const tumu = tokenizeFull(text);
   const bilgi = tumu.filter(w => !DURAK.has(w) && !DURAK.has(kok(w)));
   const kaynak = bilgi.length ? bilgi : tumu.filter(w => !DURAK.has(w));
   const kelimeler = kaynak.length ? kaynak : tumu;
-  if (!kelimeler.length) return { tutulan: 0, toplam: 0, oran: 0 };
+  if (!kelimeler.length) return { tutulan: 0, toplam: 0, oran: 0, guclu: bilgi.length > 0 };
 
   let tutulan = 0;
   for (const w of kelimeler) {
-    if (kelimeBicimleri(w).some(b => dokKokleri.has(b))) tutulan++;
+    // Tam bicim eşleşmesi (tercih edilen)
+    if (kelimeBicimleri(w).some(b => dokKokleri.has(b))) { tutulan++; continue; }
+    /* v3: ek/çekim toleransı — "kaçarmı"/"kaçta" → iskelet "kc" = "kaç"ınki.
+       SADEce dokümanın iskelet kümesi varsa ve en az 3 harflikse uygulanır;
+       kısa iskeletler ("kc") yanlışlıkla çok şeyle eşleşebilir. */
+    if (dokIskeletleri) {
+      const isk = kelimeIskelesi(w);
+      let tuttu = false;
+      for (const d of dokIskeletleri) {
+        if (iskeletTutar(isk, d)) { tuttu = true; break; }
+      }
+      if (tuttu) { tutulan++; continue; }
+    }
   }
-  return { tutulan, toplam: kelimeler.length, oran: tutulan / kelimeler.length };
+  return {
+    tutulan,
+    toplam: kelimeler.length,
+    oran: tutulan / kelimeler.length,
+    guclu: bilgi.length > 0,
+  };
 }
 
 function trigrams(s) {
@@ -478,14 +625,27 @@ class SoruEslestirici {
 
     for (const v of veriler) {
       const kokSet = new Set();
+      const soruKokSet = new Set();   // v3: SADECE sorulardan (cevap metni hariç)
+      const iskeletSet = new Set();   // v3: ek/çekim toleransı için ünsüz iskeletleri
       const normSorular = [];
       for (const s of v.sorular) {
         normSorular.push(normalize(s));
-        for (const k of kokler(s)) kokSet.add(k);
+        for (const k of kokler(s)) { kokSet.add(k); soruKokSet.add(k); }
+        for (const k of iskelet(s)) iskeletSet.add(k);
       }
-      const toks = [...kokSet];
+      /* v3: `kokler` SADECE soruları tarıyor; cevap metni hiç eklenmiyordu ama
+         `dok.kokler` adı "dokümanın tüm kelimeleri" gibi okunuyordu. İsim
+         netleşsin: soruKokleri = sorular. `kokler` aynı kümeyi işaret ediyor. */
+      const toks = [...soruKokSet];
       toplamUzunluk += toks.length;
-      dokumanlar.push({ kayit: v, kokler: kokSet, normSorular, uzunluk: toks.length });
+      dokumanlar.push({
+        kayit: v,
+        kokler: kokSet,
+        soruKokleri: soruKokSet,
+        iskeletler: iskeletSet,
+        normSorular,
+        uzunluk: toks.length,
+      });
       for (const k of toks) df.set(k, (df.get(k) || 0) + 1);
     }
 
@@ -523,7 +683,7 @@ dokumanSkoru(normSorgu, sorguKokleri, dok, idfIdx, ozKokler = null, ozKelimeSayi
      kelimenin 2 biçimi ("bugun" + "bug") 2 eşleşme sayılıyordu.
      "bugun hava nasil" → kapsam 1.00 → "saat kaç" cevabı.
      Artık her kelime en fazla 1 kez sayılır. */
-  const kk = kelimeKapsami(normSorgu, dok.kokler);
+  const kk = kelimeKapsami(normSorgu, dok.kokler, dok.iskeletler);
   const ozKapsam = ozKelimeSayisi > 0 ? kk.oran : (oz.length
     ? [...oz].filter(k => dok.kokler.has(k)).length / oz.length
     : 0);
@@ -606,6 +766,37 @@ dokumanSkoru(normSorgu, sorguKokleri, dok, idfIdx, ozKokler = null, ozKelimeSayi
       const bicimler = kelimeBicimleri(sorguKelime);
       const anaSoruda = bicimler.some(b => dok.koklerSoru?.has(b));
       tekKelimeCarpani = anaSoruda === false ? 0.70 : 1;
+    }
+  }
+
+  /* ── v3: TEK KELİME + SORU KALIBI KAPISI ──
+     Kök neden (kullanıcı bildirimi, canlı):
+       "hile nedir"  → "en iyi hile nedir" cevabı döndü. Skor 0.76.
+       "saat kaçarmı hahha" → "saat kaç" cevabı (yanlış saçmalayan cevap).
+
+     Sebep: DURAK soru kelimelerini elince geriye TEK bilgi kelimesi kalıyor,
+     kapsam 1.00 oluyor ve tek kelime oranı tek başına eşiği geçiyor.
+     Oysa kullanıcı "nedir" diye GENEL bir tanım sordu; doküman ise
+     "en iyi hile nedir" gibi DAHA DAR bir niyet taşıyor. Kullanıcının
+     yazmadığı 2+ kelime (burada "en", "iyi") sadece dokümanda varsa
+     cevap fazla iddialı olur → sus ve AI'a bırak.
+
+     İstisna: kayıt zaten neredeyse aynıysa ("vape" ↔ "vape nedir")
+     fark küçüktür; ölçü kullanılan kelimelerin ORANI, sayısı değil. */
+  if (kk.toplam === 1 && kk.tutulan === 1) {
+    const sorguKelimeleri = new Set(tokenizeFull(normSorgu));
+    const sorguBicimler = new Set();
+    for (const w of sorguKelimeleri) for (const b of kelimeBicimleri(w)) sorguBicimler.add(b);
+    // Dokümanın ANA sorusunda geçen bilgi kelimelerinin ne kadarı kullanıcıda var?
+    const anaKelimeler = tokenizeFull(dok.normSorular?.[0] || "")
+      .filter(w => !DURAK.has(w) && !DURAK.has(kok(w)));
+    if (anaKelimeler.length >= 2) {
+      const kapsanan = anaKelimeler.filter(w =>
+        sorguKelimeleri.has(w) || kelimeBicimleri(w).some(b => sorguBicimler.has(b))
+      ).length;
+      const oran = kapsanan / anaKelimeler.length;
+      // 2 kelimelik dokümanda 1 tanesi ("hile" ↔ "en iyi hile") → 0.50 → ceza
+      tekKelimeCarpani *= 0.45 + 0.55 * oran;
     }
   }
 

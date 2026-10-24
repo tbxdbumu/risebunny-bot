@@ -2682,6 +2682,72 @@
       ],
       "cevap": "🐰 **RiseBunny Launcher'ın desteklediği client'lar:**\n• **Rubidium V4** — birincil, en çok test edilen 🏆\n• **Vape V4 / V4.22** — launcher üzerinden ücretsiz açılır 💎\n• **Lunar Client Cosmetics modu** — launcher üzerinden ücretsiz 💎\n\nHepsi tek launcher'dan kurulur: https://risebunny.vercel.app/risebunny\nİndirme / destek: https://dsc.gg/risebunny\nTakılırsan: https://discord.gg/mEfz5SfpbR",
       "cevap_en": "🐰 **Clients supported by RiseBunny Launcher:**\n• **Rubidium V4** — primary and most tested 🏆\n• **Vape V4 / V4.22** — unlocked free via the launcher 💎\n• **Lunar Client Cosmetics mode** — free via the launcher 💎\n\nEverything installs from one launcher: https://risebunny.vercel.app/risebunny\nDownload / support: https://dsc.gg/risebunny\nStuck? https://discord.gg/mEfz5SfpbR"
+    },
+    {
+      "kategori": "hile",
+      "sorular": [
+        "hile nedir",
+        "hile ne demek",
+        "hile ne işe yarar",
+        "cheat nedir",
+        "what is a cheat",
+        "what is a cheat client",
+        "what does cheat mean",
+        "hile nasıl çalışır",
+        "client hilesi nedir",
+        "mcg hile nedir",
+        "hile neye denir",
+        "cheat client nedir"
+      ],
+      "cevap": "🎮 **Hile (cheat client)**, Minecraft'a sonradan eklenen ve oyunun normalde sana vermediği yetenekleri açan yazılımdır — örneğin KillAura, Scaffold, Fly, ESP gibi modüller.\nRiseBunny tarafında öne çıkan client **Rubidium V4**; ayrıca Vape V4 / V4.22 ve Lunar Client **Cosmetik modu** launcher üzerinden ücretsiz açılıyor.\n• Kurulum: https://risebunny.vercel.app/risebunny\n• İndirme / destek: https://dsc.gg/risebunny\n• Destek sunucusu: https://discord.gg/mEfz5SfpbR",
+      "cevap_en": "🎮 **A cheat client** is software added on top of Minecraft that unlocks abilities the game doesn't normally give you — modules like KillAura, Scaffold, Fly and ESP.\nOn the RiseBunny side the main client is **Rubidium V4**; Vape V4 / V4.22 and Lunar Client **Cosmetics mode** are also unlocked free through the launcher.\n• Install: https://risebunny.vercel.app/risebunny\n• Download / support: https://dsc.gg/risebunny\n• Support server: https://discord.gg/mEfz5SfpbR"
+    },
+    {
+      "kategori": "genel",
+      "sorular": [
+        "wikipedia ne işe yarar",
+        "vikipedi ne işe yarar",
+        "wikipedia nedir",
+        "vikipedi nedir",
+        "wikipedia ne demek",
+        "what is wikipedia",
+        "wikipedia nasıl kullanılır",
+        "vikipedi ne işe yarar"
+      ],
+      "cevap": "📚 **Wikipedia (Vikipedi)**, gönüllülerin birlikte yazdığı, ücretsiz ve açık bir çevrimiçi ansiklopedidir. Bir konu hakkında genel bakış, tanım veya özet öğrenmek için kullanılır; akademik kaynak yerine geçmez.\nBen de dış dünya sorularında (\"… kimdir\", \"… nedir\") Wikipedia'dan özet çekip sana aktarabiliyorum. Dene: `rise albert einstein kimdir`",
+      "cevap_en": "📚 **Wikipedia** is a free, openly written online encyclopedia built by volunteers. It's used for a general overview, definition or summary of a topic — it isn't a substitute for academic sources.\nI can also pull Wikipedia summaries for outside-world questions (\"who is…\", \"what is…\"). Try: `rise who is albert einstein`"
+    },
+    {
+      "kategori": "genel",
+      "sorular": [
+        "açık kaynak nedir",
+        "acik kaynak nedir",
+        "open source nedir",
+        "what is open source",
+        "açık kaynak ne demek",
+        "açık kaynak ne işe yarar",
+        "open source ne demek",
+        "açık kaynak kodlu ne demek"
+      ],
+      "cevap": "🔓 **Açık kaynak (open source)**, kaynak kodu herkesin görebildiği, inceleyebildiği ve lisansın izin verdiği ölçüde değiştirip paylaşabildiği yazılımdır.\nÖrnekler: Linux, Firefox, Python, Blender.\nRiseBunny Bot'un kendi kaynak kodu da GitHub üzerinde duruyor: `https://github.com/tbxdbumu/risebunny-bot` 🐰",
+      "cevap_en": "🔓 **Open source** means the source code is publicly available — anyone can read it and, within the license, modify and share it.\nExamples: Linux, Firefox, Python, Blender.\nRiseBunny Bot's own source is on GitHub too: `https://github.com/tbxdbumu/risebunny-bot` 🐰"
+    },
+    {
+      "kategori": "genel",
+      "sorular": [
+        "yapay zeka nedir",
+        "yapay zeka ne demek",
+        "ai nedir",
+        "yapay zeka ne işe yarar",
+        "hangi yapay zeka",
+        "yapay zeka nasıl çalışır",
+        "ai ne demek",
+        "what is ai",
+        "what is artificial intelligence",
+        "yapay zekâ nedir"
+      ],
+      "cevap": "🤖 **Yapay zeka (AI)**, bilgisayarın insan gibi öğrenip karar vermesini sağlayan sistemlerin genel adıdır — veriyle eğitilir, örüntü bulur, tahmin üretir.\nBen de böyle bir sistemim: sorularını anlayıp cevaplamak için dil modeli kullanıyorum.\nBir konuyu araştırmamı istersen sor: `rise albert einstein kimdir`",
+      "cevap_en": "🤖 **Artificial intelligence (AI)** is the umbrella term for systems that let computers learn and decide like humans — trained on data, they find patterns and make predictions.\nI am one too: I use a language model to understand and answer your questions.\nIf you want me to research a topic: `rise who is albert einstein`"
     }
   ]
 }
