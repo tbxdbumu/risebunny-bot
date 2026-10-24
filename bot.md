@@ -740,6 +740,190 @@ ID ile silme, kanal ID, aynı ID'yi iki kez yazma.
 
 ---
 
+## 13. AI cevap kalitesi + web araştırması (2026)
+
+Kullanıcı geri bildirimi (Discord'da canlı görülen hata):
+
+> "its have local ai and temp is so low i will fix soon .d böyle bir sorun var
+> istenilen cevabı versin ve sorulan soruları duruma göre internetten
+> araştırabilsin"
+
+Yani iki istek: (1) sorulan soruya **gerçekten istenen** cevabı versin,
+(2) dış dünya sorularını **internetten araştırsın**. Üstüne: "sonucu ve cümleyi
+AI okuyup değerlendirsin son sonucu ve kullanıcıya dönen cevabı gene AI verecek."
+
+### 13.1 Teşhis — sahada görülen 4 hata
+
+| # | Belirti | Kök neden |
+|---|---------|-----------|
+| 1 | "What's best hack client" → **hiçbir cevap yok** (bot susuyor) | `cevaplar.json`'da bu yazım yoktu; matcher `ESLESMEDI` döndü |
+| 2 | "why Rubidium" → "Rubidium V4 için: dsc.gg/risebunny 🐰" (soruya cevap değil) | "neden" kalıbı yoktu, en yakın *indirme linki* kaydına düştü |
+| 3 | "another client instead of Rubidium" → yine link cevabı | alternatif client kaydı hiç yoktu |
+| 4 | "en iyi hile client ne" → cevap İngilizce sorulunca **Türkçe** geldi | `cevap_en` alanı Türkçeydi (kopyala-yapıştır hatası) |
+
+Ek olarak: `chainAsk` **parametresiz** çağrılıyordu → `temperature 0.7`
+(bilgi botu için fazla yaratıcı) ve `max_tokens 400` (listeli cevap yarıda
+kesiliyordu). Kullanıcının "temp is so low" gözlemi tersine dönmüş: sorun
+düşük sıcaklık değil, **yanlış yerel kayda düşmek** ve **kısa token** idi.
+
+### 13.2 Yapılanlar
+
+**a) `cevaplar.json` — 45 yeni varyant + 1 yeni kayıt**
+
+- `en iyi hile nedir` → +15 ("what's best hack client", "best hack client"…)
+- `rubidium vs vape` → +11 ("why rubidium", "rubidium neden", "rubidium neden en iyi"…)
+- `rubidium v4 nedir` → +7 ("rubidium alternatifi", "alternative to rubidium"…)
+- **Yeni kayıt:** `başka hile client var mı` (12 varyant) — launcher'ın
+  desteklediği üç client'ı listeler (Rubidium V4 / Vape V4-V4.22 / Lunar Cosmetics).
+  Mevcut kayıtlara sıkıştırmak yanlış cevap riski taşıyordu.
+
+`cevap_en` alanı Türkçe olan 6 kayıt düzgün İngilizceye çevrildi
+(`#34 vape`, `#41 rubidium`, `en iyi hile nedir`, `hangi hileler ücretsiz`,
+`vape v4 ücretsiz nasıl alırım`, `rubidium vs vape`). Artık `cevap == cevap_en`
+olan kayıt **0**.
+
+> Kalan 10 "TR-EN" uyarısı yanlış pozitif: İngilizce cevabın içinde
+> `(Turkish: r!çek)` gibi komut takma adı veriliyor — doğru davranış.
+
+**b) `ai/matcher.js`**
+
+- Eşik `0.42 → 0.60`. Ölçüm (15 doğru + 15 yanlış soruyla):
+  0.42–0.65 arası **15/15 doğru geçiyor, 0/15 yanlış sızıyor**; 0.70'te 2 doğru
+  kaçmaya başlıyor. 0.60 pay bırakıyor.
+- `bilgi-ek` kayıtlarında `cevap_en` artık `e.cevap`'a ezilmiyor
+  (`e.cevap_en || e.cevap`).
+
+**c) `ai/handler.js` — sağlayıcı ayarları**
+
+```js
+const aiAyar = {
+  temperature: Number(process.env.AI_SICAKLIK || 0.35),
+  maxTokens:   Number(process.env.AI_MAX_TOKEN || 900),
+};
+```
+
+Sıcaklık 0 vermiyoruz: 0'da model kendini tekrar ediyor ve ezber cümle
+kuruyor. 0.35 bilgi botu için doğru aralık. Token 400 → 900 (listeli cevaplar
+kesilmesin). İkisi de env ile değiştirilebilir.
+
+**d) `ai/web.js` — YENİ DOSYA (web araştırma + AI değerlendirmesi)**
+
+Akış:
+
+```
+soru ──► arastirmaliMi()  ──hayır──► normal akış (3b)
+              │ evet
+              ▼
+         toplama: Wikipedia TR ─► (zayıfsa) Wikipedia EN ─► (boşsa) başlık REST
+              │
+              ▼
+         degerlendir()  ← AI (River ilk, jsonMode)
+              │  model: "bu kaynaklar soruyu karşılıyor mu?" + CEVABI YAZAR
+              ├── yeterli:true  ──► cevap doğrudan kullanıcıya (3a)
+              └── yeterli:false ──► kaynaklar ATILIR, normal akış (3b)
+```
+
+Karar noktaları:
+
+- **Neden AI'a soruyoruz, kelime eşleşmesine güvenmiyoruz?**
+  `"türkiyenin başkenti neresi"` → Wikipedia `"Sefer Turan"` (bir gazeteci)
+  döndürdü. Başlıkta "türkiye" yok ama skor yüksek. Kelime/başlık benzerliği
+  **alaka ölçmez**. Artık kaynakları model okuyup seçiyor; hiçbiri
+  karşılamıyorsa `yeterli:false` dönüyor ve bot kaynaksız cevap veriyor —
+  **uydurma kaynak göstermiyor**.
+- **Son cevabı da AI yazıyor.** `degerlendir()` aynı çağrıda cevabı üretiyor,
+  `handler.js` ikinci kez modele sormuyor (gecikme + tutarsızlık olurdu).
+- **`yeterli:false` ise kaynaklar prompt'a GİRMEZ.** İlk sürümde hepsi
+  giriyordu; "Sefer Turan" normal cevaba da sızabiliyordu. Düzeltildi.
+- **Botun kendi konuları araştırılmaz** (`IC_KONULAR`): rubidium, vape,
+  launcher, premium, hile, bot, komut… Orada doğru kaynak bilgi tabanı;
+  web yanlış bilgi getirir.
+- **JSON ayrıştırma dayanıklı:** ```` ```json ```` çiti, önsöz metni,
+  sondaki fazla virgül — hepsi tolere ediliyor. Bozuk JSON →
+  güvenli `yeterli:false`.
+- **`kullanilan` numaraları süzülür** (1..N dışındakiler atılır).
+- **`yeterli:true` ama `cevap` boş → `false`** (boş mesaj gönderilmesin).
+
+**e) `aramaSorgulari()` — sorgu sadeleştirme**
+
+`"türkiyenin başkenti"` 3 sonuç döndürüyor ama hepsi alakasız. Bu yüzden
+sırayla daha kısa sorgular denenir ve **başlık uyumuna** bakılır
+(sorgunun kelimeleri madde başlığında geçiyor mu?):
+
+```
+"türkiyenin başkenti" → "türkiyenin" → "türkiye"
+```
+
+Ayrıca Türkçe iyelik/hâl ekleri kırpılır.
+
+**f) Dayanıklılık**
+
+- `_get()`: 429 / 5xx'te bekleyip tekrar dener (Wikipedia eşzamanlı
+  isteklerde 429 dönüyor — testte görüldü).
+- Zaman bütçesi: tek istek 4 sn, toplam 8 sn (`WEB_TIMEOUT_MS`,
+  `WEB_TOTAL_MS`). Bütçe dolunca elde olanla dönülür — araştırma "bonus",
+  engel değil.
+- 10 dk önbellek (anahtar: konu + ai + dil). Discord'da aynı soru sık geliyor.
+
+**g) DuckDuckGo kaldırıldı — çalışmıyordu**
+
+Ölçüm:
+
+| Kaynak | Sonuç |
+|--------|-------|
+| `html.duckduckgo.com` | HTTP **202** + boş sayfa (bot koruması) |
+| `lite.duckduckgo.com` | HTTP **202** + boş sayfa |
+| `api.duckduckgo.com` | HTTP 200 ama `AbstractText` **boş** |
+| SearXNG (genel örnek) | HTTP **403** |
+| **Wikipedia TR (arama + özet)** | **HTTP 200, çalışıyor** ✅ |
+| **Wikipedia EN** | **HTTP 200, çalışıyor** ✅ |
+| Brave (`BRAVE_API_KEY` varsa) | çalışır (anahtar opsiyonel) |
+
+DDG parse kodu çalışsa bile **veri gelmiyordu** — "web araması yapıyor" gibi
+görünen ama hep boş dönen ölü kod. Silindi, yerine yorum bırakıldı.
+
+### 13.3 Testler
+
+| Test | Sonuç |
+|------|-------|
+| `web-test.js` (canlı Wikipedia, 24 vaka) | **24/24** |
+| `web-stres.js` (ardışık 6 konu, rate-limit) | **6/6**, ~220 ms ortalama |
+| `web-ai-mock-test.js` (sahte model, 24 vaka) | **24/24** |
+| `handler-web-test.js` (sahte Discord + sahte model, 7 vaka) | **7/7** |
+| `girisrol-test.js` / `girisrol-id-test.js` | 48/48, 21/21 |
+| `seviye-ayar-test.js` / `otomasyon-test.js` | 24/24, 18/18 |
+
+`node --check` temiz: `handler.js`, `web.js`, `matcher.js`, `providers.js`,
+`river.js`, `bot.js`, `utils.js`, `girisrol.js`, `seviye-ayar.js`, `otomasyon.js`.
+
+`handler-web-test.js` doğrular:
+1. AI kaynağı yeterli buldu → cevap **doğrudan** gider, sağlayıcı **çağrılmaz**.
+2. AI yetersiz buldu → sağlayıcıya gidilir ve **"Sefer Turan" prompt'a girmez**.
+3. Araştırma gerekmiyorsa normal akış bozulmaz.
+
+### 13.4 Ortam değişkenleri (hepsi opsiyonel)
+
+| Değişken | Varsayılan | Ne yapar |
+|----------|-----------|----------|
+| `AI_SICAKLIK` | `0.35` | Normal cevap sıcaklığı |
+| `AI_MAX_TOKEN` | `900` | Normal cevap uzunluğu |
+| `AI_ESIK` | `0.60` | Yerel eşleştirici eşiği |
+| `WEB_TIMEOUT_MS` | `4000` | Tek web isteği zaman aşımı |
+| `WEB_TOTAL_MS` | `8000` | Toplam araştırma bütçesi |
+| `WEB_AI_SICAKLIK` | `0.2` | Değerlendirme modeli sıcaklığı |
+| `WEB_AI_MAX_TOKEN` | `700` | Değerlendirme cevap uzunluğu |
+| `BRAVE_API_KEY` | — | Varsa Brave Search de kullanılır |
+
+### 13.5 Bilinen sınır
+
+`.env` içindeki `RIVER_API_KEY` **boş**. Bu yüzden AI değerlendirmesi canlı
+olarak çalıştırılamadı; akış sahte model ile (24 + 7 vaka) doğrulandı, web
+toplama tarafı ise **gerçek ağla** (24 + 6 vaka) doğrulandı. Anahtar
+girildiğinde `degerlendir()` devreye girer; girilmezse `webSonuc.yeterli`
+hep `false` kalır ve bot eskisi gibi yedek sağlayıcılarla/devre dışı kalır.
+
+---
+
 ## 12. Destek linkleri
 
 - **Site:** `https://risebunny.vercel.app/risebunny`

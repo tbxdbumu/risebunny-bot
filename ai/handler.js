@@ -631,7 +631,89 @@ async function aiIsle(message, client) {
   // Cevap dili: kullanıcı seçimi → mesajın dili (algılandı) → varsayılan EN
   const secili = hasLang(message.author.id) ? getLangSync(message.author.id) : null;
   const lang = secili === "tr" || secili === "en" ? secili : (alg.dil || "en");
-  const groqSonuc = await chainAsk(buildSystemPrompt(egitimVerileriniHazirla(message.guild?.id), lang), soru, lang);
+
+  /* ── Sağlayıcı ayarları (2026 düzeltmesi) ──
+     Eski çağrı parametresizdi → sıcaklık 0.7 (yaratıcı), max_tokens 400.
+     Sonuç: kısa/gergin cevaplar ve yarıda kesilen uzun cevaplar.
+     • Sıcaklık 0.35: bot bilgi veriyor, hikâye yazmıyor. Yine de tamamen
+       0 vermiyoruz; 0'da model kendini tekrar ediyor ve ezber cümleler
+       kuruyor.
+     • max_tokens 900: Rubidium/kurulum gibi listeli cevaplar kesilmesin.
+       Ortamla değiştirilebilir (AI_SICAKLIK, AI_MAX_TOKEN).
+     • Zincir aynı kalıyor: River ilk, başarısızsa yedekler. */
+  const aiAyar = {
+    temperature: Number(process.env.AI_SICAKLIK || 0.35),
+    maxTokens: Number(process.env.AI_MAX_TOKEN || 900),
+  };
+
+  /* ── 3a) WEB ARAŞTIRMASI (2026) ──
+     Yerel bilgi tabanı ve sunucu otomasyonu cevap veremedi. Modelin ezberine
+     güvenmek yerine gerçek kaynaklardan bilgi topluyoruz ("mrbeast kimdir",
+     "guncel haber" gibi dış dünya soruları).
+
+     `arastirmaliMi()` botun kendi konularında (rubidium, premium, launcher…)
+     ARAŞTIRMA YAPMAZ — orada doğru kaynak bilgi tabanı, web yanlış bilgi
+     getirebilir.
+
+     İKİ KATMANLI AI:
+      1. `arastir()` topladığı kaynakları modele okutur; model hangisinin
+         soruyu gerçekten karşıladığına karar verir (kelime eşleşmesi değil).
+         Aynı çağrıda CEVABI DA yazar → `webSonuc.cevap`.
+      2. Kaynak yeterliyse o cevap doğrudan kullanıcıya gider (aşağıda).
+         Yeterli değilse model "uydurma" demeyecek şekilde boş döner ve
+         normal akış (3b) devam eder — kaynaksız, kendi bilgisiyle cevap. */
+  let webSonuc = null;
+  try {
+    const web = require("./web");
+    if (web.arastirmaliMi(soru)) {
+      webSonuc = await web.arastir(soru, { dil: lang });
+      if (webSonuc?.ok) {
+        console.log(`🌐 [AI Web] "${soru}" → konu "${webSonuc.konu}", ${webSonuc.sonuclar.length} kaynak, yeterli=${webSonuc.yeterli}`);
+      }
+    }
+  } catch (e) {
+    console.warn("[AI Web] arastirma hatasi:", e?.message || e);
+  }
+
+  /* Web + AI cevabı hazırsa doğrudan gönder.
+     Burada ikinci kez modele sormuyoruz: cevabı zaten `degerlendir()` yazdı,
+     tekrar sormak hem gecikme hem tutarsızlık (farklı cevap) demekti. */
+  if (webSonuc?.yeterli && webSonuc.cevap) {
+    const cevap = prefixTemizle(webSonuc.cevap);
+    const { t } = require("../dil");
+
+    const learnId = `learn_${Date.now().toString(36)}_${Math.random().toString(36).substr(2, 6)}`;
+    learnCache.set(learnId, { soru, cevap });
+    setTimeout(() => learnCache.delete(learnId), LEARN_CACHE_TTL);
+
+    const ogretBtnWeb = new ButtonBuilder()
+      .setCustomId(`ai_learn_${learnId}`)
+      .setLabel(t(lang, "ai.ogretButon"))
+      .setStyle(ButtonStyle.Success)
+      .setEmoji("🧠");
+    const rowWeb = new ActionRowBuilder().addComponents(ogretBtnWeb);
+
+    try {
+      await message.reply({
+        content: cevap.slice(0, 2000),
+        components: [rowWeb],
+        allowedMentions: { repliedUser: false },
+      });
+    } catch {
+      await message.channel.send({ content: cevap.slice(0, 2000), allowedMentions: { parse: [] } }).catch(() => {});
+    }
+    console.log(`🌐 [AI Web Cevap] ${message.author.tag}: "${soru}" → ${cevap.length} karakter (guven=${webSonuc.guven.toFixed(2)})`);
+    return true;
+  }
+
+  // 3b) Kaynak yetersiz → normal sağlayıcı zinciri.
+  //     DİKKAT: `yeterli=false` ise AI kaynakları alakasız buldu demektir;
+  //     onları prompt'a koymak modeli yanlış yöne iter ("Sefer Turan" olayı).
+  //     Sadece AI'ın onayladığı kaynaklar bağlam olarak verilir.
+  const webBaglam = webSonuc?.ok && webSonuc.yeterli ? require("./web").baglamMetni(webSonuc, lang) : "";
+  const sistemPrompt = buildSystemPrompt(egitimVerileriniHazirla(message.guild?.id), lang) + webBaglam;
+
+  const groqSonuc = await chainAsk(sistemPrompt, soru, lang, aiAyar);
 
   if (groqSonuc.success) {
     const cevap = prefixTemizle(groqSonuc.cevap);

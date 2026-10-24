@@ -374,7 +374,7 @@ class SoruEslestirici {
   constructor(db, ayar = {}) {
     this.db = db;
     /** Bu skorun altındaki adaylar kullanılmaz. */
-    this.esik = ayar.esik ?? Number(process.env.AI_ESIK || 0.42);
+    this.esik = ayar.esik ?? Number(process.env.AI_ESIK || 0.60);
     /** En iyi ve ikinci en iyi aday bu kadar yakınsa cevap verilmez (belirsizlik kapısı). */
     this.marj = ayar.marj ?? Number(process.env.AI_MARJ || 0.02);
     this.cache = null;
@@ -455,7 +455,7 @@ class SoruEslestirici {
         soru: e.sorular[0],
         sorular: e.sorular,
         cevap: e.cevap,
-        cevap_en: e.cevap,
+        cevap_en: e.cevap_en || e.cevap,
         kategori: e.kategori,
         kaynak: "ek",
         kullanim: 0,
