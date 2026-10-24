@@ -797,14 +797,24 @@ olan kayıt **0**.
 
 ```js
 const aiAyar = {
-  temperature: Number(process.env.AI_SICAKLIK || 0.35),
+  temperature: Number(process.env.AI_SICAKLIK || 0.85),
   maxTokens:   Number(process.env.AI_MAX_TOKEN || 900),
 };
 ```
 
-Sıcaklık 0 vermiyoruz: 0'da model kendini tekrar ediyor ve ezber cümle
-kuruyor. 0.35 bilgi botu için doğru aralık. Token 400 → 900 (listeli cevaplar
-kesilmesin). İkisi de env ile değiştirilebilir.
+Token 400 → 900 (listeli cevaplar kesilmesin). İkisi de env ile değiştirilebilir.
+
+**Sıcaklık 0.85 (2026-10, kullanıcı isteği).** Önce 0.35'e çekilmişti; canlıda
+cevaplar fazla tekdüze/ezber geldi. 0.85 daha doğal cümle kuruyor ama
+uydurmaya kaçacak kadar yüksek değil (1.0+ dağılıyor). Önemli nokta: bu ayar
+**sadece modelin serbest yazdığı cevapları** etkiliyor — yerel kayıt
+(`cevaplar.json`) eşleşince cevap hiç modele gitmiyor, ayrıca web
+değerlendirmesi bilerek soğuk (`WEB_AI_SICAKLIK 0.2`) kalıyor ki kaynak
+sadakati bozulmasın.
+
+Varsayılanlar üç yerde birlikte güncellendi (tutarsızlık olmasın):
+`handler.js` `aiAyar`, `providers.js` üç `ayar.temperature ?? 0.85`,
+`river.js` `sohbet({ temperature = 0.85 })`.
 
 **d) `ai/web.js` — YENİ DOSYA (web araştırma + AI değerlendirmesi)**
 
@@ -890,6 +900,7 @@ görünen ama hep boş dönen ölü kod. Silindi, yerine yorum bırakıldı.
 | `web-stres.js` (ardışık 6 konu, rate-limit) | **6/6**, ~220 ms ortalama |
 | `web-ai-mock-test.js` (sahte model, 24 vaka) | **24/24** |
 | `handler-web-test.js` (sahte Discord + sahte model, 7 vaka) | **7/7** |
+| `sicaklik-test.js` (sıcaklık gerçekten 0.85 gidiyor mu, 7 vaka) | **7/7** |
 | `girisrol-test.js` / `girisrol-id-test.js` | 48/48, 21/21 |
 | `seviye-ayar-test.js` / `otomasyon-test.js` | 24/24, 18/18 |
 
@@ -905,7 +916,7 @@ görünen ama hep boş dönen ölü kod. Silindi, yerine yorum bırakıldı.
 
 | Değişken | Varsayılan | Ne yapar |
 |----------|-----------|----------|
-| `AI_SICAKLIK` | `0.35` | Normal cevap sıcaklığı |
+| `AI_SICAKLIK` | `0.85` | Normal cevap sıcaklığı |
 | `AI_MAX_TOKEN` | `900` | Normal cevap uzunluğu |
 | `AI_ESIK` | `0.60` | Yerel eşleştirici eşiği |
 | `WEB_TIMEOUT_MS` | `4000` | Tek web isteği zaman aşımı |

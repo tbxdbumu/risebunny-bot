@@ -635,14 +635,16 @@ async function aiIsle(message, client) {
   /* ── Sağlayıcı ayarları (2026 düzeltmesi) ──
      Eski çağrı parametresizdi → sıcaklık 0.7 (yaratıcı), max_tokens 400.
      Sonuç: kısa/gergin cevaplar ve yarıda kesilen uzun cevaplar.
-     • Sıcaklık 0.35: bot bilgi veriyor, hikâye yazmıyor. Yine de tamamen
-       0 vermiyoruz; 0'da model kendini tekrar ediyor ve ezber cümleler
-       kuruyor.
+     • Sıcaklık 0.85: kullanıcı isteği (2026-10). Bot daha doğal, ezber
+       olmayan cümleler kuruyor; yerel kayıtlar zaten eşleşince doğrudan
+       dönüyor, bu ayar sadece modelin yazdığı serbest cevapları etkiliyor.
+       Metin uyduracak kadar yüksek değil (1.0+ dağılır) ama 0.35'in
+       tekdüzeliğini kırıyor.
      • max_tokens 900: Rubidium/kurulum gibi listeli cevaplar kesilmesin.
        Ortamla değiştirilebilir (AI_SICAKLIK, AI_MAX_TOKEN).
      • Zincir aynı kalıyor: River ilk, başarısızsa yedekler. */
   const aiAyar = {
-    temperature: Number(process.env.AI_SICAKLIK || 0.35),
+    temperature: Number(process.env.AI_SICAKLIK || 0.85),
     maxTokens: Number(process.env.AI_MAX_TOKEN || 900),
   };
 

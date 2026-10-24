@@ -65,7 +65,7 @@ async function sohbet({
   messages = null,
   jsonMode = false,
   maxTokens = MAX_TOKEN,
-  temperature = 0.7,
+  temperature = 0.85,
   model = null,
 } = {}) {
   if (!anahtarVar()) return { ok: false, status: 401, error: "RIVER_API_KEY tanımlı değil" };

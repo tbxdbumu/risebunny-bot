@@ -45,7 +45,7 @@ async function callOpenAI(p, systemPrompt, soru, apiKey, ayar = {}) {
         { role: "user", content: soru },
       ],
       max_tokens: ayar.maxTokens || 400,
-      temperature: ayar.temperature ?? 0.7,
+      temperature: ayar.temperature ?? 0.85,
       ...(ayar.jsonMode ? { response_format: { type: "json_object" } } : {}),
     }),
     signal: AbortSignal.timeout(ayar.timeout || 15000),
@@ -71,7 +71,7 @@ async function callGemini(p, systemPrompt, soru, apiKey, ayar = {}) {
         body: JSON.stringify({
           system_instruction: systemPrompt ? { parts: [{ text: _kisalt(systemPrompt, 12000) }] } : undefined,
           contents: [{ parts: [{ text: soru }] }],
-          generationConfig: { maxOutputTokens: ayar.maxTokens || 400, temperature: ayar.temperature ?? 0.7 },
+          generationConfig: { maxOutputTokens: ayar.maxTokens || 400, temperature: ayar.temperature ?? 0.85 },
         }),
         signal: AbortSignal.timeout(ayar.timeout || 15000),
       });
@@ -134,7 +134,7 @@ async function chainAsk(systemPrompt, soru, lang = "tr", ayar = {}) {
         soru,
         jsonMode: !!ayar.jsonMode,
         maxTokens: ayar.maxTokens || 400,
-        temperature: ayar.temperature ?? 0.7,
+        temperature: ayar.temperature ?? 0.85,
       });
       if (r.ok) {
         return { success: true, cevap: r.cevap, provider: `river/${r.model}`, json: r.json || null };
