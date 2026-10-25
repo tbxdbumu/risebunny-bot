@@ -566,8 +566,13 @@ async function aiIsle(message, client) {
 
   // 1) Global local bilgi tabanı (cevaplar.json + ai_qa_)
   //    Cevap, kullanıcının diline göre seçilir: cevap_en varsa ve dil EN ise o verilir.
-  const sonuc = await matcher.bul(soru);
   const { cevapDili, dilAlgila: dilAlgilaLocal, anlamiyorumMesaji: anlamiyorumLocal } = require("./lang");
+
+  // Hedef dil eşleştirmeye ÖNCEDEN verilir: EN kullanıcıya cevap_en'i olmayan
+  // kayıt dönmesin (DB kayıtlarının hiçbirinde cevap_en yok — TR metni sızıyordu).
+  const _sec0 = hasLang(message.author.id) ? getLangSync(message.author.id) : null;
+  const _hedef0 = cevapDili(_sec0, soru).dil;
+  const sonuc = await matcher.bul(soru, { dil: _hedef0 });
 
   // Desteklenmeyen dilde yazıldıysa yerel eşleştirici de cevap uydurmasın
   const algYerel = dilAlgilaLocal(soru);
@@ -581,7 +586,18 @@ async function aiIsle(message, client) {
     const hedefDil = cevapDili(sec, soru).dil;
     const hamCevap = hedefDil === "en" && sonuc.cevap_en ? sonuc.cevap_en : sonuc.cevap;
     await yerelCevapGonder(message, client, matcher.degiskenleriDoldur ? matcher.degiskenleriDoldur(hamCevap, message, client) : hamCevap, "");
-    try { db.add(`ai_qa_${sonuc.id}_kullanim`, 1); } catch {}
+    // Kullanım sayacı: kaydın KENDİ alanına yazılmalı.
+    // ESKİ HATA: db.add(`ai_qa_${id}_kullanim`, 1) → croxydb bunu AYRI anahtar
+    // olarak yazıyor ("..._kullanim": 5), kaydın kullanim alanı hep 0 kalıyordu.
+    // Ayrıca builtin kayıtlarda taban anahtar olmadığı için 14 kayıt metni
+    // tamamen kayboldu. Artık kaydın içindeki alan artırılıyor.
+    try {
+      const kayitKey = `ai_qa_${sonuc.id}`;
+      const kayit = db.fetch(kayitKey);
+      if (kayit && typeof kayit === "object") {
+        db.set(kayitKey, { ...kayit, kullanim: (Number(kayit.kullanim) || 0) + 1 });
+      }
+    } catch {}
     console.log(`🤖 [AI Local] ${message.author.tag}: "${soru}" → "${sonuc.soru}" (skor: ${sonuc.skor.toFixed(2)})`);
     return true;
   }

@@ -35,7 +35,11 @@ module.exports = [
       "Kanalı seçtikten sonra yeni üye katıldığında kartlı mesaj otomatik gönderilir. Sorun sürerse " + SUNUCU + " 🐰",
   },
 
-  /* ── Vape / Lunar / hile indirme (kanonik cevap) ───────────── */
+  /* ── Vape kurulumu — PLATFORM VE ERİŞİM GERÇEĞİYLE ──────────
+     v5 DÜZELTME: Burada "Vape kurulumu — ücretsiz" ve "Cosmetik modu
+     ücretsiz açılır" yazıyordu. Vape ücretsiz DEĞİL; erişim premium ile
+     açılır ve premium parayla satılmaz, bot komutlarıyla kazanılır.
+     Ayrıca Vape SADECE PC'de çalışır. Bilgi kaynağı: ai/hile.js          */
   {
     kategori: "vape",
     sorular: [
@@ -53,15 +57,22 @@ module.exports = [
       "how to download vape",
     ],
     cevap:
-      "🎮 **Vape V4 / V4.22 kurulumu — ücretsiz:**\n" +
+      "🎮 **Vape V4 / V4.22 kurulumu** (sadece PC / Windows):\n" +
       "1. RiseBunny Launcher'ı indir: " + SITE + "/risebunny\n" +
       "2. Discord ile giriş yap.\n" +
       "3. Vape V4 / V4.22 seç → **Kur**.\n" +
-      "4. Cosmetik modu launcher üzerinden ücretsiz açılır 💎\n" +
-      "İndirme: " + DESTEK + " • Yardım: " + SUNUCU,
+      "Erişim **RiseBunny Premium** ile açılır; premium parayla satılmaz, bot komutlarıyla kazanılır.\n" +
+      "**Mobilde çalışmaz.** İndirme: " + DESTEK + " • Yardım: " + SUNUCU,
+    cevap_en:
+      "🎮 **Vape V4 / V4.22 installation** (PC / Windows only):\n" +
+      "1. Download the RiseBunny Launcher: " + SITE + "/risebunny\n" +
+      "2. Sign in with Discord.\n" +
+      "3. Pick Vape V4 / V4.22 → **Install**.\n" +
+      "Access unlocks with **RiseBunny Premium**; premium is not sold for money, you earn it with bot commands.\n" +
+      "**Does not work on mobile.** Download: " + DESTEK + " • Help: " + SUNUCU,
   },
   {
-    kategori: "hile",
+    kategori: "lunar",
     sorular: [
       "lunar client nasıl indirilir",
       "lunar client kurulum",
@@ -75,12 +86,26 @@ module.exports = [
       "lunar client premium ücretsiz",
     ],
     cevap:
-      "🌙 **Lunar Client — Cosmetik modu ücretsiz:**\n" +
-      "RiseBunny Launcher üzerinden Lunar Client'ı kur, **Cosmetik Modu**nu işaretle → ücretsiz aktif olur 💎\n" +
+      "🌙 **Lunar Client — Cosmetik modu** (sadece PC):\n" +
+      "RiseBunny Launcher üzerinden Lunar Client'ı kur, **Cosmetik Modu**nu işaretle → aktif olur.\n" +
+      "**Mobilde çalışmaz.**\n" +
       "• Launcher: " + SITE + "/risebunny\n" +
       "• İndirme / destek: " + DESTEK + "\n" +
       "• Kurulum yardımı: " + SUNUCU,
+    cevap_en:
+      "🌙 **Lunar Client — Cosmetics mode** (PC only):\n" +
+      "Install Lunar Client through the RiseBunny Launcher, tick **Cosmetics Mode** → it activates.\n" +
+      "**Does not work on mobile.**\n" +
+      "• Launcher: " + SITE + "/risebunny\n" +
+      "• Download / support: " + DESTEK + "\n" +
+      "• Install help: " + SUNUCU,
   },
+
+  /* ── "Hangi client" — ÖVGÜSÜZ, PLATFORM DUYARLI ────────────────
+     v5 DÜZELTME: Burada "🏆 Rubidium V4" diye marka ilan ediliyordu ve
+     "Vape ... ücretsiz" yazıyordu. Artık üç seçenek eşit sunuluyor ve
+     platform gerçeği yazılı. "En iyi" kararını AI verir (web araştırması
+     ile), bu kayıt sadece gerçekleri taşır.                               */
   {
     kategori: "hile",
     sorular: [
@@ -93,11 +118,24 @@ module.exports = [
       "hile hangisi iyi",
       "mcg nedir",
       "en iyi hile hangi launcher",
+      "en iyi hile nedir",
+      "en iyi hile",
+      "en iyi hile hangisi",
     ],
     cevap:
-      "🏆 **Rubidium V4** — RiseBunny Launcher ile tek tıkla kurulur ve ücretsizdir 🐰\n" +
-      "Vape V4 / V4.22 ve Lunar Client **Cosmetik modu** da aynı launcher üzerinden ücretsiz açılır 💎\n" +
+      "🎯 **RiseBunny Launcher'daki seçenekler:**\n" +
+      "• **Rubidium V4** — hafif ve stabil · **PC + mobil** (mobilde PojavLauncher / Java emülatörü ile)\n" +
+      "• **Vape V4 / V4.22** — geniş modül havuzu · **sadece PC** · erişim Premium ile açılır\n" +
+      "• **Lunar Client Cosmetics** — kozmetik modu · **sadece PC**\n" +
+      "Hangisinin uygun olduğu platformuna ve aradığın modüllere bağlı.\n" +
       "• Launcher: " + SITE + "/risebunny • İndirme: " + DESTEK + " • Destek: " + SUNUCU,
+    cevap_en:
+      "🎯 **Options in the RiseBunny Launcher:**\n" +
+      "• **Rubidium V4** — light and stable · **PC + mobile** (via PojavLauncher / Java emulator on mobile)\n" +
+      "• **Vape V4 / V4.22** — large module pool · **PC only** · access unlocks with Premium\n" +
+      "• **Lunar Client Cosmetics** — cosmetics mode · **PC only**\n" +
+      "Which one fits depends on your platform and the modules you want.\n" +
+      "• Launcher: " + SITE + "/risebunny • Download: " + DESTEK + " • Support: " + SUNUCU,
   },
 
   /* ── Sık sorulan kısa sorular ──────────────────────────────── */

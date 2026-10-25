@@ -1078,6 +1078,104 @@ varyant eklendi, düzeldi. `bot musun` gibi çok kısa sorular hâlâ komşu kay
 
 ---
 
+---
+
+## 15. Tutarlılık turu (v5) — tek doğruluk kaynağı + katalog küçültme
+
+Kullanıcı şikâyeti: "cevaplar tutarlı değil, marka övgüsü var, local AI'da olan
+cevapları azalt, her alanda AI ağırlıklı olsun".
+
+### 15.1 Ölçülen kök nedenler (tahmin değil, ölçüm)
+
+| # | Köken | Kanıt |
+|---|---|---|
+| 1 | `ai/handler.js:584` sayaç hatası | `db.add("ai_qa_<id>_kullanim", 1)` → croxydb bunu AYRI anahtar yazıyor. **827/827 kayıtta `kullanim` hep 0** |
+| 2 | Aynı hatanın ikinci etkisi | `builtin` kayıtlarında taban anahtar olmadığı için **14 kayıt metni tamamen kayboldu** (yetim sayaç) |
+| 3 | `ai/matcher.js` DB önceliği | DB kayıtları `oncelik: 0.08` alıyordu → düzeltilmiş `cevaplar.json` kaydını **gölgeliyordu**. "Vape için ücretsiz erişim sağlamıyorum" metni buradan geliyordu |
+| 4 | `ai/bilgi-ek.js` ikinci kaynak | Vape "**ücretsiz**" ve "🏆 Rubidium V4" övgüsü burada. `cevaplar.json`'daki tüm düzeltmeleri boşa çıkarıyordu |
+| 5 | `ai/groq.js` ezber prompt | "Doğrudan şu cevabı ver: En iyi hile: Rubidium V4..." → model **her** hile sorusuna aynı reklamı basıyordu |
+| 6 | `cevap_en` hiç yok | **0/827 DB kaydında `cevap_en`**. `value.cevap_en \|\| value.cevap` yüzünden İngilizce kullanıcı **Türkçe cevap** alıyordu |
+| 7 | `hile nedir` yanlış kayda | 0.65 skorla **ekonomi / yazı-tura** cevabı dönüyordu |
+| 8 | Mükerrer kayıtlar | 872 DB kaydı / 279 benzersiz soru → **219 mükerrer**, 150'si farklı cevap taşıyor |
+
+### 15.2 Yapılanlar
+
+**Yeni: `ai/hile.js` — tek doğruluk kaynağı**
+
+Hile bilgisi 4 ayrı yerde duruyordu (`cevaplar.json`, `groq.js` prompt,
+`matcher.js` eşanlamlıları, `web.js`). Artık tek dosya: `URUNLER`,
+`platformSor()`, `mobilCevabi()`, `erisimMetni()`, `urunListesi()`,
+`promptBlogu()`. Değiştirmek gerekirse **sadece bu dosya** değişir.
+
+**Onaylanmış gerçekler (kullanıcı):**
+
+- Rubidium V4 → **PC + mobil** (PojavLauncher / Java emülatörü üzerinden)
+- Vape V4 / V4.22 → **sadece PC**
+- Lunar Client Cosmetics → **sadece PC**
+- Premium → **parayla satılmaz**, bot komutlarıyla kazanılır
+- "En iyi hile" → **AI + internet araştırması** karar verir, bot ilan etmez
+
+**`ai/groq.js`** — prompt'tan "Doğrudan şu cevabı ver" ezber blokları silindi.
+Yerine `hile.promptBlogu(lang, platform)` geliyor: gerçekler + "birini ezberden
+en iyi ilan ETME" kuralı. Mobil soruda yalnız mobilde çalışan önerilir.
+
+**`ai/handler.js`** — sayaç kaydın KENDİ alanına yazılıyor. Ayrıca hedef dil
+eşleştirmeye önceden veriliyor.
+
+**`ai/matcher.js`**
+
+- DB ve ek kayıtların `oncelik` bonusu kaldırıldı (gölgeleme bitti)
+- `bul(soru, {dil})`: EN ise `cevap_en`'i olmayan kayıt **aday olamaz**
+- `esik` 0.60 → **0.70**. Gerekçe ölçüm: "hile nedir" 0.65 ile alakasız
+  ekonomi kaydına düşüyordu; 0.70 bunu kapatıyor, karşılığında yalnız **1 doğru
+  cevap** AI'a gidiyor (yanlış sayısı artmıyor)
+
+**`ai/web.js`**
+
+- `IC_KONULAR`'dan `vape|rubidium|lunar|hile|cheat` çıkarıldı → bu sorular
+  **artık internete çıkabiliyor** (kullanıcı isteği)
+- `DIS_KONU_IPUCU` TR/EN paritesine getirildi ("saat kaç" ile "what time is it"
+  artık aynı kararı veriyor)
+
+**`ai/bilgi-ek.js`** — Vape "ücretsiz" ve "🏆 Rubidium" övgüsü düzeltildi;
+üç seçenek eşit, platform gerçeğiyle listeleniyor.
+
+**`cevaplar.json`** — çelişen kayıtlar tek gerçeğe çekildi (#33/#34/#156 Vape,
+#41/#125/#142 Rubidium + mobil bilgisi, #154–#159 hile kayıtları yeniden yazıldı).
+
+**Katalog küçültme (onaylı): 163 → 156 (7 kayıt silindi)**
+
+- Genel kültür (AI + web daha iyi): `wikipedia`, `açık kaynak`, `yapay zeka`
+- Hile (artık `hile.js` + prompt veriyor): `en iyi hile`, `hile ücretsiz`,
+  `başka client`, `hile nedir`
+- **Korundu:** koruma kapatma, ticket kapatma, config oy limiti (botun kendi
+  mekaniği — AI uydurmamalı)
+
+Zayıf dilli ama **değerli** 6 kayıt silinmedi, metni düzeltildi:
+#61, #64, #69, #132, #139, #140 ("kaynakta … belirtiliyor" → net anlatım).
+
+### 15.3 Doğrulama
+
+| Test | Sonuç |
+|---|---|
+| `celiski-denetle.js` (ürün bazlı) | **0 çelişki** (Rubidium ücretsiz=2 premium=0 · Vape ücretsiz=0 premium=3) |
+| `web-karar-test.js` | **41/41** sınıflandırma, **15/15** TR/EN parite |
+| `dil-parite.js` | **0/18 uyumsuz** |
+| `v4-taban.js` (14 canlı soru) | hepsi doğru · `hile nedir` artık AI'a |
+| `test/bot-driver.cjs` | geçti (EXIT=0) |
+| `test/bot-runtime-test.cjs` | **21/21** |
+
+### 15.4 Bilinen sınırlar
+
+- `RIVER_API_KEY` hâlâ boş → AI çağrıları yapılandırılmamış döner. Yerel
+  kayıtlar bu yüzden silinmedi; anahtar girilince AI devreye girer.
+- DB'de 219 mükerrer soru ve 45 yetim sayaç kaydı duruyor. Bunlar **temizlenmedi**
+  (veri kaybı riski). `oncelik` bonusu kalktığı için artık gölgeleme yapmıyorlar.
+- `esik` 0.70: katalog dışı bazı doğru cevaplar AI'a gidiyor. Kullanıcı isteği
+  bu yönde olduğu için bilinçli takas.
+
+---
+
 ## 12. Destek linkleri
 
 - **Site:** `https://risebunny.vercel.app/risebunny`

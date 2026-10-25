@@ -39,11 +39,40 @@ const onbellek = new Map(); // anahtar -> { t, veri }
 
 /* ────────────────────── Ne zaman araştırılır? ────────────────────── */
 
-/** Botun kendi konuları: burada web'e çıkmak zararlı (yanlış bilgi riski). */
-const IC_KONULAR = /\b(rubidium|vape|lunar|risebunny|launcher|premium|hile|cheat|bot|komut|prefix|laf|token|seviye|level|ekonomi|pet|kupon|ticket|otomasyon|ban|kick|mute|jail|guard|modlog|siterol|girisrol|otorol)\b/i;
+/**
+ * Botun KENDİ SİSTEMLERİ — burada web'e çıkmak zararlı (yanlış bilgi riski).
+ *
+ * v4 (2026-10) DEĞİŞİKLİĞİ — `vape|lunar|hile|cheat|rubidium` ÇIKARILDI:
+ * Önceki liste bu kelimeleri içerdiği için "en iyi mobil hile" gibi sorular
+ * internete HİÇ çıkmıyordu; model ezbere konuşuyordu. Kullanıcı "internetteki
+ * minecraft hilelerini araştırsın" dedi.
+ *
+ * Artık ayrım şu:
+ *   - Botun kendi mekaniği (ban, ekonomi, ticket, komut...) → ARAŞTIRMA YOK
+ *   - Hile/client/piyasa bilgisi → ARAŞTIR (gerçekleri hile.js verir, web ek bilgi)
+ *
+ * `risebunny` hâlâ içeride: markanın kendi launcher/premium akışı internette
+ * yanlış anlatılıyor, orada bilgi tabanı doğru kaynak.
+ */
+const IC_KONULAR = /\b(bot|komut\w*|prefix|laf|token|seviye\w*|level|ekonomi|pet|kupon|ticket|destek-talebi|otomasyon|ban|kick|mute|jail|guard|modlog|siterol|girisrol|otorol|risebunny|premium|launcher)\b/i;
 
-/** Dış dünya hakkında soru mu? (araştırılabilir) */
-const DIS_KONU_IPUCU = /\b(kim|kimdir|nedir|ne zaman|nerede|hangi|kaç|nasıl|neden|niçin|tarih|ülke|başkent|film|dizi|oyun|şarkı|albüm|takım|futbol|basketbol|seçim|haber|son|güncel|who|what|when|where|which|how|why|history|capital|movie|series|game|song|album|team|news|latest|current)\b/i;
+/**
+ * Dış dünya hakkında soru mu? (araştırılabilir)
+ *
+ * v4: TR/EN PARİTESİ. Önceki listede TR taraf eksikti; "saat kaç" araştırmıyor
+ * ama "what time is it" araştırıyordu (aynı soru, farklı davranış). Artık her
+ * kavramın TR ve EN karşılığı birlikte duruyor.
+ */
+const DIS_KONU_IPUCU = new RegExp([
+  /* soru kelimeleri — TR */
+  "kim|kimdir|kimler|nedir|ne\\s+zaman|nerede|nereden|hangi|kaç|nasıl|neden|niçin|ne\\s+işe",
+  /* soru kelimeleri — EN */
+  "who|what|when|where|which|how|why|whose|whom",
+  /* alanlar — TR */
+  "tarih|ülke|başkent|film|dizi|oyun|şarkı|albüm|takım|futbol|basketbol|seçim|haber|güncel|hile|cheat|client|mobil|mobile|sürüm|fiyat",
+  /* alanlar — EN */
+  "history|capital|movie|series|game|song|album|team|football|soccer|basketball|election|news|latest|current|cheat|hack|client|mobile|version|price|best",
+].join("|"), "i");
 
 /**
  * Bu soru için web araştırması yapılmalı mı?

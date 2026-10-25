@@ -872,10 +872,21 @@
         "what is vape",
         "vape features",
         "tell me about vape",
-        "vape info"
+        "vape info",
+        "vape mobilde çalışır mı",
+        "vape mobile",
+        "vape telefonda çalışır mı",
+        "vape android",
+        "vape ios",
+        "does vape work on mobile",
+        "vape on mobile",
+        "vape mobil",
+        "vape java mobile",
+        "vape mobilde oynanır mı",
+        "vape pojavlauncher"
       ],
-      "cevap": "🎮 **Vape V4.22**, Minecraft için gelişmiş bir client'tır.\n• Birden çok MC sürümünü tek kod tabanında destekler\n• Modüller, profiller, ClickGui ve public config paylaşımı içerir\n• RiseBunny Premium ile tam erişim açılır 💎\n\nPremium: `{{prefix}}premium-al` veya https://risebunny.vercel.app\nDestek/indirme: https://discord.gg/mEfz5SfpbR\n\n🎮 **Vape V4.22** is an advanced Minecraft client (multi-version, modules, profiles, ClickGui, public config sharing). Unlock full access with RiseBunny Premium 💎: https://risebunny.vercel.app • Discord: https://discord.gg/mEfz5SfpbR",
-      "cevap_en": "🎮 **Vape V4.22** is an advanced Minecraft client: multi-version support, modules, profiles, ClickGui and public config sharing. Unlock full access with RiseBunny Premium 💎: https://risebunny.vercel.app • Discord: https://discord.gg/mEfz5SfpbR"
+      "cevap": "🎮 **Vape V4 / V4.22**, Minecraft için gelişmiş bir client'tır.\n• Birden çok MC sürümünü tek kod tabanında destekler\n• Modüller, profiller, ClickGui ve public config paylaşımı içerir\n• Erişim **RiseBunny Premium** ile açılır — Premium **parayla satılmaz**; bot komutlarıyla kazanılır (`{{prefix}}günlük`, `{{prefix}}çalış`, etkinlikler).\n• **Sadece PC (Windows)**, mobilde çalışmaz\n• Launcher: https://risebunny.vercel.app/risebunny\n• İndirme / destek: https://dsc.gg/risebunny\n• Destek sunucusu: https://discord.gg/mEfz5SfpbR",
+      "cevap_en": "🎮 **Vape V4 / V4.22** is an advanced Minecraft client.\n• Supports multiple MC versions on one codebase\n• Modules, profiles, ClickGui and public config sharing\n• Access unlocks with **RiseBunny Premium** — Premium is **not sold for money**; you earn it with bot commands (`{{prefix}}daily`, `{{prefix}}work`, events).\n• **PC (Windows) only**, does not work on mobile\n• Launcher: https://risebunny.vercel.app/risebunny\n• Download / support: https://dsc.gg/risebunny\n• Support server: https://discord.gg/mEfz5SfpbR"
     },
     {
       "kategori": "vape",
@@ -907,8 +918,8 @@
         "vape launcher nasıl kullanılır",
         "vape ücretsiz kurulum"
       ],
-      "cevap": "🎮 **Vape V4 / V4.22 ücretsiz!** RiseBunny Launcher üzerinden kurulur:\n• Launcher: https://risebunny.vercel.app/risebunny\n• İndirme linki: https://dsc.gg/risebunny\n• Vape V4 · V4.22 ve Lunar Client **Cosmetik modu** launcher ile ücretsiz açılır 💎\n• Kurulumda yardım: https://discord.gg/mEfz5SfpbR 🐰",
-      "cevap_en": "🎮 **Vape V4 / V4.22 — free!** Installed through RiseBunny Launcher:\n• Launcher: https://risebunny.vercel.app/risebunny\n• Download link: https://dsc.gg/risebunny\n• Vape V4 · V4.22 and Lunar Client **Cosmetics mode** are unlocked free with the launcher 💎\n• Installation help: https://discord.gg/mEfz5SfpbR 🐰"
+      "cevap": "🎮 **Vape V4 / V4.22 ücretsiz değil.** Erişim **RiseBunny Premium** ile açılır.\nPremium **parayla satılmaz**; bot komutlarıyla kazanılır (`{{prefix}}günlük`, `{{prefix}}çalış`, etkinlikler).\nAyrıca Vape **sadece PC (Windows)** içindir, mobilde çalışmaz.\n• Launcher: https://risebunny.vercel.app/risebunny\n• İndirme / destek: https://dsc.gg/risebunny\n• Destek sunucusu: https://discord.gg/mEfz5SfpbR",
+      "cevap_en": "🎮 **Vape V4 / V4.22 is not free.** Access unlocks with **RiseBunny Premium**.\nPremium is **not sold for money**; you earn it with bot commands (`{{prefix}}daily`, `{{prefix}}work`, events).\nVape is also **PC (Windows) only** — it does not work on mobile.\n• Launcher: https://risebunny.vercel.app/risebunny\n• Download / support: https://dsc.gg/risebunny\n• Support server: https://discord.gg/mEfz5SfpbR"
     },
     {
       "kategori": "vape",
@@ -1048,8 +1059,8 @@
         "rubidium hangi launcher",
         "rubidium nereden indirilir 2026"
       ],
-      "cevap": "🐰 **Rubidium V4** — RiseBunny Launcher üzerinden ücretsiz kurulur:\n• Launcher: https://risebunny.vercel.app/risebunny\n• İndirme / destek: https://dsc.gg/risebunny\n• Destek sunucu: https://discord.gg/mEfz5SfpbR\nLauncher'da Discord ile giriş yap → Rubidium V4 → Kur.",
-      "cevap_en": "🐰 **Rubidium V4** — installed free through RiseBunny Launcher:\n• Launcher: https://risebunny.vercel.app/risebunny\n• Download / support: https://dsc.gg/risebunny\n• Support server: https://discord.gg/mEfz5SfpbR\nSign in to the launcher with Discord → Rubidium V4 → Install."
+      "cevap": "🐰 **Rubidium V4** — RiseBunny Launcher üzerinden ücretsiz kurulur:\n• Launcher: https://risebunny.vercel.app/risebunny\n• İndirme / destek: https://dsc.gg/risebunny\n• Destek sunucu: https://discord.gg/mEfz5SfpbR\n**Mobilde:** PojavLauncher (Java emülatörü) üzerinden çalıştırılabilir — Rubidium V4 PC client'ı olduğu için telefonda doğrudan kurulmaz, emülatör gerekir.\nLauncher'da Discord ile giriş yap → Rubidium V4 → Kur.",
+      "cevap_en": "🐰 **Rubidium V4** — installed free through RiseBunny Launcher:\n• Launcher: https://risebunny.vercel.app/risebunny\n• Download / support: https://dsc.gg/risebunny\n• Support server: https://discord.gg/mEfz5SfpbR\n**On mobile:** it can run through PojavLauncher (a Java emulator) — Rubidium V4 is a PC client, so it is not installed natively on a phone; an emulator is required.\nSign in to the launcher with Discord → Rubidium V4 → Install."
     },
     {
       "kategori": "genel",
@@ -1337,8 +1348,8 @@
         "is rob risky",
         "soygunda herşey gitti geri alınirmi"
       ],
-      "cevap": "⚠️ `{{prefix}}soygun @kullanıcı` riskli bir ekonomi komutudur; kaynakta yakalanırsan ceza alabileceğin belirtiliyor. Bankadaki paranın çalınmadığı bilgisi de mevcut. Komutun uyguladığı ceza ve bekleme süresi gibi ayrıntılar güncel bot yanıtında gösterilmelidir.",
-      "cevap_en": "⚠️ `{{prefix}}rob @user` is a risky economy command; the source says you may be fined if caught. The data also says money in the bank cannot be stolen. Check the current command response for exact penalties and cooldowns."
+      "cevap": "⚠️ `{{prefix}}soygun @kullanıcı` riskli bir ekonomi komutudur: yakalanırsan ceza ödersin. Başarı şansı hedefe ve şansa bağlıdır, garanti değildir.",
+      "cevap_en": "⚠️ `{{prefix}}soygun @user` is a risky economy command: if you get caught you pay a penalty. Success depends on the target and luck — it is not guaranteed."
     },
     {
       "kategori": "ekonomi",
@@ -1376,8 +1387,8 @@
         "see my items",
         "envanterime nereden bakcam"
       ],
-      "cevap": "🎒 `{{prefix}}envanter` sahip olduğun eşyaları listeler. Pet listesi için `{{prefix}}petlerim`, oyuncu pazarını görmek için `{{prefix}}market` komutlarını da kontrol edebilirsin.",
-      "cevap_en": "🎒 `{{prefix}}inventory` lists your items. For pets, check `{{prefix}}mypets`; for the player marketplace, use `{{prefix}}market`."
+      "cevap": "🎒 `{{prefix}}envanter` sahip olduğun eşyaları listeler.\n• Petlerin için: `{{prefix}}petlerim`\n• Oyuncu pazarı için: `{{prefix}}pazar`",
+      "cevap_en": "🎒 `{{prefix}}envanter` lists the items you own.\n• Your pets: `{{prefix}}petlerim`\n• Player market: `{{prefix}}pazar`"
     },
     {
       "kategori": "ekonomi",
@@ -1446,8 +1457,8 @@
         "how do i sell a pet",
         "petimi nasıl paraya çeviririm"
       ],
-      "cevap": "🐾 Pet satmak için `{{prefix}}pet sat <no>` komutunu kullan; `<no>` listedeki pet numarasıdır. Kaynakta satış fiyatında yaklaşık ±%10 değişim olabileceği belirtiliyor. Onay vermeden önce doğru peti seçtiğini kontrol et.",
-      "cevap_en": "🐾 Use `{{prefix}}pet sell <number>` to sell a pet; the number refers to its listing in your pet list. The source mentions a possible ±10% price variation. Confirm that you selected the correct pet before selling."
+      "cevap": "🐾 Pet satmak için `{{prefix}}pet sat <no>` yaz. `<no>` pet listendeki numaradır (`{{prefix}}petlerim` ile görürsün). Satış fiyatı petin türüne ve seviyesine göre değişir.",
+      "cevap_en": "🐾 To sell a pet use `{{prefix}}pet sat <no>`. `<no>` is the number in your pet list (see `{{prefix}}petlerim`). The sale price depends on the pet's type and level."
     },
     {
       "kategori": "moderasyon",
@@ -2193,8 +2204,8 @@
         "rubidium download not working",
         "rubidium support"
       ],
-      "cevap": "🐰 Kaynakta Rubidium V4 için şu bağlantı verilmiş: https://dsc.gg/risebunny. Bağlantı açılmıyorsa tarayıcıda yeniden dene veya RiseBunny destek sunucusundan güncel bağlantıyı iste: https://discord.gg/mEfz5SfpbR. Bu veri kümesi ayrıca bir doğrulanmış alternatif indirme bağlantısı içermiyor.",
-      "cevap_en": "🐰 The source lists https://dsc.gg/risebunny for Rubidium V4. If it does not open, retry in a browser or request the current link from the RiseBunny support server: https://discord.gg/mEfz5SfpbR. This dataset does not provide a separately verified alternative download URL."
+      "cevap": "🐰 Rubidium V4 indirme: https://dsc.gg/risebunny\n• Launcher: https://risebunny.vercel.app/risebunny\n• Destek sunucusu: https://discord.gg/mEfz5SfpbR\nBağlantı açılmıyorsa tarayıcıda yeniden dene; sorun sürerse destek sunucusundan güncel linki iste.",
+      "cevap_en": "🐰 Rubidium V4 download: https://dsc.gg/risebunny\n• Launcher: https://risebunny.vercel.app/risebunny\n• Support server: https://discord.gg/mEfz5SfpbR\nIf the link doesn't open, retry in a browser; if it persists, ask for the current link in the support server."
     },
     {
       "kategori": "destek",
@@ -2286,8 +2297,8 @@
         "how to see bot statistics",
         "sunucu istatistiklerini kim gorebilir"
       ],
-      "cevap": "📊 Anlık sunucu/üye sayıları için kaynakta `{{prefix}}istatistik` komutu belirtiliyor. Bu sayılar zamanla değişebileceği için sabit metin yerine komutun güncel çıktısını esas al. Komut görüntülenmiyorsa botun güncel yardım menüsünü kontrol et.",
-      "cevap_en": "📊 The source lists `{{prefix}}stats` (Turkish: `{{prefix}}istatistik`) for live server/member counts. These figures can change, so use the command’s current output rather than a static answer. If unavailable, check the current help menu."
+      "cevap": "📊 Sunucu ve üye sayıları için `{{prefix}}istatistik` kullan. Sayılar anlıktır ve zamanla değişir.",
+      "cevap_en": "📊 Use `{{prefix}}istatistik` for server and member counts. The numbers are live and change over time."
     },
     {
       "kategori": "premium",
@@ -2371,8 +2382,8 @@
         "risebunny ne zamandır var",
         "botunuz kaç senedir var"
       ],
-      "cevap": "🐰 Kaynakta RiseBunny ekibinin botu **2023’ten beri** geliştirdiği belirtiliyor. Bu, geliştirmenin başlangıç yılına ilişkin kaynak bilgisidir; belirli bir ilk yayın günü bu dosyada verilmemiştir.",
-      "cevap_en": "🐰 The source says the RiseBunny team has been developing the bot **since 2023**. This identifies the stated development year; the exact first release date is not provided in this file."
+      "cevap": "🐰 RiseBunny, RiseBunny ekibi (ahmetbs) tarafından **2023'ten beri** geliştiriliyor.\n• Node.js ve discord.js v14 ile yazıldı\n• 180+ komut, AI sohbet ve otomasyon içeriyor\n• Web sitesi: https://risebunny.vercel.app",
+      "cevap_en": "🐰 RiseBunny has been developed by the RiseBunny team (ahmetbs) **since 2023**.\n• Written in Node.js with discord.js v14\n• 180+ commands, AI chat and automation\n• Website: https://risebunny.vercel.app"
     },
     {
       "kategori": "genel",
@@ -2385,8 +2396,8 @@
         "siteleriniz güvenli mi",
         "bu siteye ödeme güvenlimi kart info"
       ],
-      "cevap": "🌐 Kaynakta RiseBunny web sitesi ve mağaza için https://risebunny.vercel.app adresi veriliyor. Satın almadan önce adresi dikkatle kontrol et ve şifre/token gibi gizli bilgileri bir web formuna girme. Fiyat ve ürün koşulları zamanla değişebileceğinden güncel site metnini esas al.",
-      "cevap_en": "🌐 The source lists https://risebunny.vercel.app as the RiseBunny website and shop. Check the address carefully before buying and never enter passwords or tokens into a store form. Prices and product terms can change, so rely on the current website."
+      "cevap": "🌐 Evet, resmî adresimiz **https://risebunny.vercel.app** — launcher da buradan indirilir.\n• Launcher: https://risebunny.vercel.app/risebunny\n• İndirme / destek: https://dsc.gg/risebunny\n• Destek sunucusu: https://discord.gg/mEfz5SfpbR\nBaşka bir adresten indirme yapma; resmî olmayan siteler güvenli değildir.",
+      "cevap_en": "🌐 Yes, our official address is **https://risebunny.vercel.app** — the launcher is downloaded from there.\n• Launcher: https://risebunny.vercel.app/risebunny\n• Download / support: https://dsc.gg/risebunny\n• Support server: https://discord.gg/mEfz5SfpbR\nDo not download from any other address; unofficial sites are not safe."
     },
     {
       "kategori": "vape",
@@ -2411,10 +2422,21 @@
         "rubidium yerine başka client",
         "rubidium yerine ne kullanabilirim",
         "alternative to rubidium",
-        "rubidium alternative"
+        "rubidium alternative",
+        "rubidium mobilde çalışır mı",
+        "rubidium mobile",
+        "rubidium telefonda çalışır mı",
+        "rubidium android",
+        "rubidium ios",
+        "rubidium pojavlauncher",
+        "does rubidium work on mobile",
+        "rubidium on mobile",
+        "rubidium mobil",
+        "rubidium java mobile",
+        "rubidium mobilde oynanır mı"
       ],
-      "cevap": "🐰 Bu dosyada Rubidium için yalnızca V4 indirme bağlantısı kayıtlı: https://dsc.gg/risebunny. Özellikler, uyumlu sürümler veya kurulum adımları burada açıklanmadığından kesin teknik bilgi veremem; güncel duyurular için RiseBunny Discord sunucusunu kullan.",
-      "cevap_en": "🐰 This file only records a download link for Rubidium V4: https://dsc.gg/risebunny. It does not describe features, compatible versions, or installation steps, so I cannot provide definitive technical details. Check the RiseBunny Discord for current information."
+      "cevap": "🐰 **Rubidium V4**, RiseBunny ekibinin Minecraft client'ıdır — hafif ve stabil.\n• **PC:** doğrudan çalışır.\n• **Mobil:** PojavLauncher (Java emülatörü) üzerinden çalıştırılabilir.\n• Kurulum: RiseBunny Launcher → Discord ile giriş → Rubidium V4 → Kur\n• Ücretsiz: https://risebunny.vercel.app/risebunny\n• İndirme / destek: https://dsc.gg/risebunny • Destek sunucu: https://discord.gg/mEfz5SfpbR",
+      "cevap_en": "🐰 **Rubidium V4** is the RiseBunny team's Minecraft client — light and stable.\n• **PC:** runs natively.\n• **Mobile:** can run through PojavLauncher (a Java emulator).\n• Install: RiseBunny Launcher → sign in with Discord → Rubidium V4 → Install\n• Free: https://risebunny.vercel.app/risebunny\n• Download / support: https://dsc.gg/risebunny • Support server: https://discord.gg/mEfz5SfpbR"
     },
     {
       "kategori": "destek",
@@ -2547,73 +2569,6 @@
       "cevap_en": "🤖 Use `rise <question>` to ask in natural language. Commands such as `{{prefix}}help`, `{{prefix}}ping`, or `{{prefix}}daily` perform specific bot actions. Changing settings or carrying out in-game actions still requires supported commands and the appropriate Discord permissions."
     },
     {
-      "kategori": "hile",
-      "sorular": [
-        "en iyi hile nedir",
-        "en iyi hile hangisi",
-        "en iyi hile ne",
-        "hile ne kullanmalıyım",
-        "hangi hileyi kullanayım",
-        "hangi client en iyi",
-        "best cheat",
-        "best client",
-        "en iyi client",
-        "en iyi client hangisi",
-        "en iyi minecraft hilesi",
-        "hile önerisi",
-        "hile tavsiye",
-        "hangi hile daha iyi",
-        "en iyi hile 2026",
-        "en iyi hile 2025",
-        "mcg hile",
-        "mcg",
-        "client önerisi",
-        "client tavsiyesi",
-        "what's best hack client",
-        "whats best hack client",
-        "what is the best hack client",
-        "best hack client",
-        "what is the best cheat client",
-        "which hack client is best",
-        "what's the best client",
-        "whats the best client",
-        "best hack client for mc",
-        "en iyi hack client",
-        "en iyi hile client",
-        "en iyi hack client hangisi",
-        "en iyi hile client ne",
-        "hangi hack client en iyi",
-        "en iyi hile client nedir"
-      ],
-      "cevap": "🏆 **En iyi hile: Rubidium V4** 🐰\nRubidium V4'ü **RiseBunny Launcher** üzerinden indirip tek tıkla kurabilirsin.\n• Launcher: https://risebunny.vercel.app/risebunny\n• İndirme / destek: https://dsc.gg/risebunny\n• Vape V4 / V4.22 ve Lunar Client **Cosmetik (Cosmetics) modu** RiseBunny Launcher üzerinden **ücretsiz** açılır 💎\nKurulumda takılırsan destek sunucumuz: https://discord.gg/mEfz5SfpbR",
-      "cevap_en": "🏆 **Best cheat client: Rubidium V4** 🐰\nInstall Rubidium V4 in one click with **RiseBunny Launcher**.\n• Launcher: https://risebunny.vercel.app/risebunny\n• Download / support: https://dsc.gg/risebunny\n• Vape V4 / V4.22 and Lunar Client **Cosmetics mode** are unlocked **free** through RiseBunny Launcher 💎\nIf you get stuck while installing, join our support server: https://discord.gg/mEfz5SfpbR"
-    },
-    {
-      "kategori": "hile",
-      "sorular": [
-        "hangi hileler ücretsiz",
-        "hile ücretsiz mi",
-        "ücretsiz hile var mı",
-        "bedava hile",
-        "hile nasıl kurulur",
-        "hile nasıl indirilir",
-        "hile indirme linki",
-        "hile indir",
-        "hileyi nereden indirebilirim",
-        "cheat download",
-        "free cheat",
-        "hile kurulumu",
-        "rubidium nasıl kurulur",
-        "rubidium kurulum",
-        "rubidium launcher nasıl kullanılır",
-        "hile kullanmak yasak mı",
-        "hile ban yer miyim",
-        "hile güvenli mi"
-      ],
-      "cevap": "📥 **Hile kurulumu (hepsi RiseBunny Launcher ile):**\n1. Launcher'ı indir: https://risebunny.vercel.app/risebunny\n2. Discord ile giriş yap.\n3. Rubidium V4 / Vape / Lunar Client seç ve **Kur**'a bas.\n4. Vape V4 · V4.22 ve Lunar **Cosmetik modu** launcher üzerinden ücretsiz açılır ✅\nYardım: https://dsc.gg/risebunny • Destek sunucu: https://discord.gg/mEfz5SfpbR\nNot: sunucu kurallarına ve kullandığın sunucunun anti-cheat'ine dikkat et.",
-      "cevap_en": "📥 **Installing (everything goes through RiseBunny Launcher):**\n1. Download the launcher: https://risebunny.vercel.app/risebunny\n2. Join Discord and grab the download / support link: https://dsc.gg/risebunny\n3. Run the launcher, pick your client (Rubidium V4 / Vape V4 / V4.22 / Lunar Cosmetics), hit Install.\n\n💎 **Everything is free** through the launcher — no purchase needed.\nStuck? Support server: https://discord.gg/mEfz5SfpbR"
-    },
-    {
       "kategori": "vape",
       "sorular": [
         "vape v4 ücretsiz nasıl alırım",
@@ -2629,10 +2584,15 @@
         "lunar client premium ücretsiz",
         "lunar client nasıl ücretsiz kullanılır",
         "lunar client crack",
-        "lunar free"
+        "lunar free",
+        "lunar mobilde çalışır mı",
+        "lunar mobile",
+        "lunar client mobile",
+        "does lunar work on mobile",
+        "lunar client mobilde"
       ],
-      "cevap": "💎 **Vape V4 / V4.22 ve Lunar Client Cosmetik modu RiseBunny Launcher ile ÜCRETSİZ!**\n• Launcher: https://risebunny.vercel.app/risebunny\n• İndirme: https://dsc.gg/risebunny\n• Destek / kurulum yardımı: https://discord.gg/mEfz5SfpbR 🐰\nLauncher'da Discord ile giriş yap, ilgili client'ı seç, Cosmetik modunu işaretle ve kur.",
-      "cevap_en": "💎 **Vape V4 / V4.22 free via RiseBunny Launcher:**\n1. Install the launcher: https://risebunny.vercel.app/risebunny\n2. Open it → select **Vape V4** (or V4.22) → Install.\n3. The launcher handles unlocking for you — you don't buy it separately.\n\n• Download / support: https://dsc.gg/risebunny\n• Help: https://discord.gg/mEfz5SfpbR"
+      "cevap": "💎 **Vape V4 / V4.22 ücretsiz değil** — erişim **Premium** ile açılır. Premium **parayla satılmaz**; bot komutlarıyla kazanılır (`{{prefix}}günlük`, `{{prefix}}çalış`, etkinlikler).\n**Lunar Client Cosmetik modu** ise launcher üzerinden açılır.\nİkisi de **sadece PC (Windows)** içindir, mobilde çalışmaz.\n• Launcher: https://risebunny.vercel.app/risebunny\n• İndirme / destek: https://dsc.gg/risebunny\n• Destek sunucusu: https://discord.gg/mEfz5SfpbR",
+      "cevap_en": "💎 **Vape V4 / V4.22 is not free** — access unlocks with **Premium**. Premium is **not sold for money**; you earn it with bot commands (`{{prefix}}daily`, `{{prefix}}work`, events).\n**Lunar Client Cosmetics mode** however opens through the launcher.\nBoth are **PC (Windows) only** — they do not work on mobile.\n• Launcher: https://risebunny.vercel.app/risebunny\n• Download / support: https://dsc.gg/risebunny\n• Support server: https://discord.gg/mEfz5SfpbR"
     },
     {
       "kategori": "hile",
@@ -2659,95 +2619,8 @@
         "rubidium advantages",
         "rubidium avantajları"
       ],
-      "cevap": "⚔️ **Rubidium V4 vs Vape:**\n• **Rubidium V4** — ücretsiz, hafif ve stabil; RiseBunny Launcher ile tek tıkla kurulur. ✅\n• **Vape V4 / V4.22** — modül ve config havuzu geniş; launcher üzerinden ücretsiz erişilebilir.\n• **Lunar Client Cosmetik modu** — launcher ile ücretsiz açılır.\nLauncher: https://risebunny.vercel.app/risebunny • İndirme/destek: https://dsc.gg/risebunny",
-      "cevap_en": "⚔️ **Rubidium V4 vs Vape:**\n• **Rubidium V4** — free, lightweight and stable; installs in one click with RiseBunny Launcher ✅\n• **Vape V4 / V4.22** — classic and polished, **unlocked free** through the launcher 💎\n• **Lunar Client Cosmetics mode** — also free via the launcher 💎\n\nBoth install from the same launcher: https://risebunny.vercel.app/risebunny\nDownload / support: https://dsc.gg/risebunny\nSupport server: https://discord.gg/mEfz5SfpbR"
-    },
-    {
-      "kategori": "hile",
-      "sorular": [
-        "başka hile client var mı",
-        "başka client var mı",
-        "alternatif client",
-        "alternatif hile",
-        "rubidium yerine başka hile",
-        "başka hile öner",
-        "hangi başka hileler var",
-        "other cheat clients",
-        "are there other clients",
-        "alternatif hile client",
-        "başka hile yok mu",
-        "rubidium dışında ne var",
-        "another client instead of rubidium",
-        "rubidium alternatifi"
-      ],
-      "cevap": "🐰 **RiseBunny Launcher'ın desteklediği client'lar:**\n• **Rubidium V4** — birincil, en çok test edilen 🏆\n• **Vape V4 / V4.22** — launcher üzerinden ücretsiz açılır 💎\n• **Lunar Client Cosmetics modu** — launcher üzerinden ücretsiz 💎\n\nHepsi tek launcher'dan kurulur: https://risebunny.vercel.app/risebunny\nİndirme / destek: https://dsc.gg/risebunny\nTakılırsan: https://discord.gg/mEfz5SfpbR",
-      "cevap_en": "🐰 **Clients supported by RiseBunny Launcher:**\n• **Rubidium V4** — primary and most tested 🏆\n• **Vape V4 / V4.22** — unlocked free via the launcher 💎\n• **Lunar Client Cosmetics mode** — free via the launcher 💎\n\nEverything installs from one launcher: https://risebunny.vercel.app/risebunny\nDownload / support: https://dsc.gg/risebunny\nStuck? https://discord.gg/mEfz5SfpbR"
-    },
-    {
-      "kategori": "hile",
-      "sorular": [
-        "hile nedir",
-        "hile ne demek",
-        "hile ne işe yarar",
-        "cheat nedir",
-        "what is a cheat",
-        "what is a cheat client",
-        "what does cheat mean",
-        "hile nasıl çalışır",
-        "client hilesi nedir",
-        "mcg hile nedir",
-        "hile neye denir",
-        "cheat client nedir"
-      ],
-      "cevap": "🎮 **Hile (cheat client)**, Minecraft'a sonradan eklenen ve oyunun normalde sana vermediği yetenekleri açan yazılımdır — örneğin KillAura, Scaffold, Fly, ESP gibi modüller.\nRiseBunny tarafında öne çıkan client **Rubidium V4**; ayrıca Vape V4 / V4.22 ve Lunar Client **Cosmetik modu** launcher üzerinden ücretsiz açılıyor.\n• Kurulum: https://risebunny.vercel.app/risebunny\n• İndirme / destek: https://dsc.gg/risebunny\n• Destek sunucusu: https://discord.gg/mEfz5SfpbR",
-      "cevap_en": "🎮 **A cheat client** is software added on top of Minecraft that unlocks abilities the game doesn't normally give you — modules like KillAura, Scaffold, Fly and ESP.\nOn the RiseBunny side the main client is **Rubidium V4**; Vape V4 / V4.22 and Lunar Client **Cosmetics mode** are also unlocked free through the launcher.\n• Install: https://risebunny.vercel.app/risebunny\n• Download / support: https://dsc.gg/risebunny\n• Support server: https://discord.gg/mEfz5SfpbR"
-    },
-    {
-      "kategori": "genel",
-      "sorular": [
-        "wikipedia ne işe yarar",
-        "vikipedi ne işe yarar",
-        "wikipedia nedir",
-        "vikipedi nedir",
-        "wikipedia ne demek",
-        "what is wikipedia",
-        "wikipedia nasıl kullanılır",
-        "vikipedi ne işe yarar"
-      ],
-      "cevap": "📚 **Wikipedia (Vikipedi)**, gönüllülerin birlikte yazdığı, ücretsiz ve açık bir çevrimiçi ansiklopedidir. Bir konu hakkında genel bakış, tanım veya özet öğrenmek için kullanılır; akademik kaynak yerine geçmez.\nBen de dış dünya sorularında (\"… kimdir\", \"… nedir\") Wikipedia'dan özet çekip sana aktarabiliyorum. Dene: `rise albert einstein kimdir`",
-      "cevap_en": "📚 **Wikipedia** is a free, openly written online encyclopedia built by volunteers. It's used for a general overview, definition or summary of a topic — it isn't a substitute for academic sources.\nI can also pull Wikipedia summaries for outside-world questions (\"who is…\", \"what is…\"). Try: `rise who is albert einstein`"
-    },
-    {
-      "kategori": "genel",
-      "sorular": [
-        "açık kaynak nedir",
-        "acik kaynak nedir",
-        "open source nedir",
-        "what is open source",
-        "açık kaynak ne demek",
-        "açık kaynak ne işe yarar",
-        "open source ne demek",
-        "açık kaynak kodlu ne demek"
-      ],
-      "cevap": "🔓 **Açık kaynak (open source)**, kaynak kodu herkesin görebildiği, inceleyebildiği ve lisansın izin verdiği ölçüde değiştirip paylaşabildiği yazılımdır.\nÖrnekler: Linux, Firefox, Python, Blender.\nRiseBunny Bot'un kendi kaynak kodu da GitHub üzerinde duruyor: `https://github.com/tbxdbumu/risebunny-bot` 🐰",
-      "cevap_en": "🔓 **Open source** means the source code is publicly available — anyone can read it and, within the license, modify and share it.\nExamples: Linux, Firefox, Python, Blender.\nRiseBunny Bot's own source is on GitHub too: `https://github.com/tbxdbumu/risebunny-bot` 🐰"
-    },
-    {
-      "kategori": "genel",
-      "sorular": [
-        "yapay zeka nedir",
-        "yapay zeka ne demek",
-        "ai nedir",
-        "yapay zeka ne işe yarar",
-        "hangi yapay zeka",
-        "yapay zeka nasıl çalışır",
-        "ai ne demek",
-        "what is ai",
-        "what is artificial intelligence",
-        "yapay zekâ nedir"
-      ],
-      "cevap": "🤖 **Yapay zeka (AI)**, bilgisayarın insan gibi öğrenip karar vermesini sağlayan sistemlerin genel adıdır — veriyle eğitilir, örüntü bulur, tahmin üretir.\nBen de böyle bir sistemim: sorularını anlayıp cevaplamak için dil modeli kullanıyorum.\nBir konuyu araştırmamı istersen sor: `rise albert einstein kimdir`",
-      "cevap_en": "🤖 **Artificial intelligence (AI)** is the umbrella term for systems that let computers learn and decide like humans — trained on data, they find patterns and make predictions.\nI am one too: I use a language model to understand and answer your questions.\nIf you want me to research a topic: `rise who is albert einstein`"
+      "cevap": "⚔️ **Rubidium V4 vs Vape V4 / V4.22**\n• **Rubidium V4** — ücretsiz, hafif. **PC + mobil** (mobilde PojavLauncher ile).\n• **Vape V4 / V4.22** — modül ve config havuzu daha geniş. **Sadece PC.** Erişim Premium ile açılır.\nHangisinin sana uygun olduğu platformuna ve aradığın modüllere bağlı. Mobildeysen Vape mümkün değil.\n• Launcher: https://risebunny.vercel.app/risebunny\n• İndirme / destek: https://dsc.gg/risebunny\n• Destek sunucusu: https://discord.gg/mEfz5SfpbR",
+      "cevap_en": "⚔️ **Rubidium V4 vs Vape V4 / V4.22**\n• **Rubidium V4** — free, lightweight. **PC + mobile** (via PojavLauncher on mobile).\n• **Vape V4 / V4.22** — larger module and config pool. **PC only.** Access unlocks with Premium.\nWhich one fits depends on your platform and the modules you want. Vape isn't possible on mobile.\n• Launcher: https://risebunny.vercel.app/risebunny\n• Download / support: https://dsc.gg/risebunny\n• Support server: https://discord.gg/mEfz5SfpbR"
     }
   ]
 }

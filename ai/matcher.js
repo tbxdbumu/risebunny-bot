@@ -520,8 +520,16 @@ function soguUzunluk(s) { return String(s || "").trim().length; }
 class SoruEslestirici {
   constructor(db, ayar = {}) {
     this.db = db;
-    /** Bu skorun altındaki adaylar kullanılmaz. */
-    this.esik = ayar.esik ?? Number(process.env.AI_ESIK || 0.60);
+    /**
+     * Bu skorun altındaki adaylar kullanılmaz.
+     *
+     * v5 (2026-10): 0.60 → 0.70.
+     * Ölçüm sonucu: "hile nedir" 0.65 ile ALAKASIZ bir ekonomi kaydına
+     * (yazı-tura) düşüyordu. 0.70 bu hatayı kapatıyor; karşılığında yalnızca
+     * 1 doğru cevap AI'a gidiyor (yanlış sayısı artmıyor). Kullanıcı isteği
+     * de "AI ağırlıklı olsun" yönünde.
+     */
+    this.esik = ayar.esik ?? Number(process.env.AI_ESIK || 0.70);
     /** En iyi ve ikinci en iyi aday bu kadar yakınsa cevap verilmez (belirsizlik kapısı). */
     this.marj = ayar.marj ?? Number(process.env.AI_MARJ || 0.02);
     this.cache = null;
@@ -547,12 +555,20 @@ class SoruEslestirici {
           soru: value.soru,
           sorular: [value.soru, ...(Array.isArray(value.varyant) ? value.varyant : [])],
           cevap: value.cevap,
-          cevap_en: value.cevap_en || value.cevap,
+          // cevap_en DB kayıtlarında genelde YOK (0/827 ölçüldü). Fallback'e
+          // işaret koyuyoruz ki eşleştirici EN kullanıcıya TR metni sessizce
+          // vermesin: bu kayıt EN için "zayıf" sayılsın.
+          cevap_en: value.cevap_en || null,
+          enYok: !value.cevap_en,
           kategori: value.kategori || "genel",
           kaynak: value.kaynak || "manual",
           kullanim: value.kullanim || 0,
           faydali: value.faydali || 0,
-          oncelik: 0.08, // öğrenilen cevaplar biraz öne çıksın
+          // v5: DB kayıtları elle yazılmış kayıtları gölgelemesin.
+          // Önceki değer 0.08 idi → düzeltilmiş cevaplar.json kaydı
+          // (ör. #34 "Vape ücretsiz değil") DB'deki eski yanlış metne
+          // yeniliyordu. Artık DB kaydı bonus almıyor.
+          oncelik: 0,
         });
       }
     } catch (e) {
@@ -607,7 +623,9 @@ class SoruEslestirici {
         kaynak: "ek",
         kullanim: 0,
         faydali: 0,
-        oncelik: 0.01,
+        // v5: bu kayıtlar cevaplar.json'u golgelemesin (önceki 0.01 bonusu
+        // "en iyi hile nedir" gibi sorularda elle düzeltilmiş kaydı yeniyordu).
+        oncelik: 0,
       });
     }
 
@@ -821,13 +839,15 @@ dokumanSkoru(normSorgu, sorguKokleri, dok, idfIdx, ozKokler = null, ozKelimeSayi
 
     const esik = ayar.esik ?? this.esik;
     const marj = ayar.marj ?? this.marj;
+    /** Hedef dil: "tr" (varsayılan) | "en". EN ise cevap_en'i olmayan kayıt elenir. */
+    const hedefDil = ayar.dil === "en" ? "en" : "tr";
     const normSorgu = normalize(soru);
     const ozKokler = kokler(soru, false);
     const sorguKokleri = genislet(ozKokler);
     if (!ozKokler.length || !normSorgu) return null;
 
     const idfIdx = this.indeks;
-    const adaylar = [];
+    let adaylar = [];
 
     // Sorgudaki BİLGİ TAŞIYAN kelime sayısı (kapsam bundan hesaplanır; köklerden değil,
     // yoksa "yardım"→"yardim|yard" 2 kök sayılıp kapsam bozulur)
@@ -848,6 +868,16 @@ dokumanSkoru(normSorgu, sorguKokleri, dok, idfIdx, ozKokler = null, ozKelimeSayi
         continue;
       }
       adaylar.push({ dok, skor: s.skor, kapsam: s.kapsam, diceSkor: s.diceSkor });
+    }
+
+    // Aday kapısı: EN kullanıcıya TR metin verilmesin.
+    // DB kayıtlarının hiçbirinde cevap_en yok (0/827 ölçüldü). Önceden bunlar
+    // `value.cevap_en || value.cevap` ile TR metnini "EN cevap" gibi döndürüyordu;
+    // İngilizce kullanıcı Türkçe cevap alıyordu. Artık hedef dil EN ise ve
+    // kaydın gerçek cevap_en'i yoksa o kayıt aday olamaz.
+    if (hedefDil === "en") {
+      adaylar = adaylar.filter((a) => a.dok.kayit.cevap_en && String(a.dok.kayit.cevap_en).trim());
+      if (!adaylar.length) return null;
     }
 
     if (!adaylar.length) return null;

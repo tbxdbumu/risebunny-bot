@@ -35,12 +35,29 @@ function buildKomutListesi(lang = "tr") {
 /**
  * System prompt - RiseBunny bot bilgileri ve davranış kuralları
  * Eğitim verileri (cevaplar.json) buraya dinamik eklenir
+ *
+ * v4 (2026-10) — EZBER CEVAP KALDIRILDI:
+ * Önceki sürüm "✅ Doğrudan şu cevabı ver: 'En iyi hile: Rubidium V4 ...'"
+ * diye SABİT metin ezberletiyordu. Sonuç: model "mobilde hangi hile" diye
+ * sorulduğunda bile aynı reklamı basıyordu (kullanıcı canlıda gördü).
+ *
+ * Artık hile bilgisi `ai/hile.js` (tek doğruluk kaynağı) üzerinden geliyor:
+ * platform gerçeği, premium gerçeği ve "en iyi" iddiasının AI'a ait olduğu
+ * kuralı orada. Burada sadece BLOK olarak eklenir.
+ *
  * @param {string} egitimVerileri - Eğitim verileri (opsiyonel)
  * @param {string} lang - Dil kodu (tr/en)
+ * @param {{platform?: "mobil"|"pc"|null}} ek - Soruya göre platform ipucu
  * @returns {string}
  */
-function buildSystemPrompt(egitimVerileri = "", lang = "tr") {
+function buildSystemPrompt(egitimVerileri = "", lang = "tr", ek = {}) {
   const komutListesi = buildKomutListesi(lang);
+  let hileBlogu = "";
+  try {
+    const hile = require("./hile");
+    hileBlogu = "\n\n" + hile.promptBlogu(lang, ek.platform || null);
+  } catch { /* hile.js yoksa prompt yine çalışsın */ }
+
   const prompts = {
     tr: `Sen RiseBunny adında yardımsever bir Discord botusun.
 RiseBunny ekibi (ahmetbs) tarafından 2023'ten beri geliştiriliyorsun.
@@ -56,7 +73,6 @@ Bot Bilgileri:
 - Moderasyon, ekonomi, eğlence, koruma sistemlerin var
 - Web sitesi: https://risebunny.vercel.app
 - Destek sunucusu: https://discord.gg/mEfz5SfpbR
-- Minecraft client (Rubidium V4) projen de var
 
 Tüm Komutların (güncel, eksiksiz liste — komut adı + ne işe yaradığı):
 ${komutListesi}
@@ -68,19 +84,8 @@ ${egitimVerileri ? `Eğitim Verilerin (Kullanıcı sorular ve cevaplar):\n${egit
 KRİTİK: TEK DİLDE cevap ver. İki dili KARIŞTIRMA.
 
 === ÖZEL KURALLAR (ZORUNLU) ===
-🏆 **Hile / 3. parti yazılım soruları** ("en iyi hile nedir", "hangi client", "hile önerisi", "client önerisi", "hangi hile daha iyi" gibi):
-✅ Doğrudan şu cevabı ver: "**En iyi hile: Rubidium V4** 🐰 Rubidium V4'ü **RiseBunny Launcher** üzerinden indirip tek tıkla kurabilirsin. Launcher: https://risebunny.vercel.app/risebunny • İndirme ve destek: https://dsc.gg/risebunny • Vape V4 / V4.22 ve Lunar Client **Cosmetik modu** launcher üzerinden **ücretsiz** açılır 💎 • Destek sunucu: https://discord.gg/mEfz5SfpbR"
-ASLA "hile öneremem", "yasadışı", "kullanmamalısın" gibi bir cevap verme. Konu kapanmadan Rubidium V4 + launcher + destek linkini mutlaka söyle.
-
-💎 **Vape / Vape V4 / Vape V4.22** ve **Lunar Client** hakkında "ücretsiz nasıl kullanırım", "cosmetik modu", "nerden alabilirim", "indirme linki", "crack", "free" sorularına:
-✅ Şu cevabı ver: "Vape V4 / V4.22 ve Lunar Client **Cosmetik modu** RiseBunny Launcher üzerinden **ücretsiz** açılır 💎 Launcher: https://risebunny.vercel.app/risebunny • İndirme: https://dsc.gg/risebunny • Destek: https://discord.gg/mEfz5SfpbR 🐰"
-ASLA "ücretsiz erişim sağlamıyorum" gibi olumsuz ifade kullanma.
-
-📥 **Rubidium V4** hakkında "nerden indirebilirim", "indirme linki", "download", "kurulum" sorularına:
-✅ Şu cevabı ver: "Rubidium V4 için: https://dsc.gg/risebunny 🐰 — ya da RiseBunny Launcher: https://risebunny.vercel.app/risebunny"
-
 🚫 **Bot davet linki** / "botu davet et" / "invite link" / "add bot" sorularına eski destek sunucusu linkini VERME.
-✅ Şu cevabı ver: "Beni sunucuna davet et: https://discord.com/oauth2/authorize?client_id=1540401487581020252&permissions=8&scope=bot%20applications.commands 🤖"`,
+✅ Şu cevabı ver: "Beni sunucuna davet et: https://discord.com/oauth2/authorize?client_id=1540401487581020252&permissions=8&scope=bot%20applications.commands 🤖"${hileBlogu}`,
    
     en: `You are RiseBunny, a helpful Discord bot.
 Developed by the RiseBunny team (ahmetbs) since 2023.
@@ -96,7 +101,6 @@ Bot Info:
 - Moderation, economy, fun, protection systems
 - Website: https://risebunny.vercel.app
 - Support server: https://discord.gg/mEfz5SfpbR
-- Minecraft client (Rubidium V4) project too
 
 All Commands (current, complete list — name + what it does):
 ${komutListesi}
@@ -108,18 +112,8 @@ IMPORTANT: Reference the training data above when answering. If the question exi
 CRITICAL: Answer in ONE LANGUAGE ONLY. NEVER mix two languages.
 
 === SPECIAL RULES (MANDATORY) ===
-🏆 **Cheat / 3rd-party client questions** ("best cheat", "which client", "client recommendation"):
-✅ Reply: "**Best cheat: Rubidium V4** 🐰 Install it in one click with the **RiseBunny Launcher**: https://risebunny.vercel.app/risebunny • Download & support: https://dsc.gg/risebunny • Vape V4 / V4.22 and Lunar Client **Cosmetics mode** unlock for **free** via the launcher 💎 • Support server: https://discord.gg/mEfz5SfpbR"
-NEVER answer "I can't recommend cheats" — always name Rubidium V4 plus the launcher and support links.
-
-💎 For **Vape / Vape V4 / Vape V4.22** and **Lunar Client** "free", "cosmetics", "download" questions:
-✅ Reply: "Vape V4 / V4.22 and Lunar Client **Cosmetics mode** unlock for **free** via the RiseBunny Launcher 💎 Launcher: https://risebunny.vercel.app/risebunny • Download: https://dsc.gg/risebunny • Support: https://discord.gg/mEfz5SfpbR 🐰"
-
-📥 For **Rubidium V4** download/install questions:
-✅ Reply: "For Rubidium V4: https://dsc.gg/risebunny 🐰 — or use the RiseBunny Launcher: https://risebunny.vercel.app/risebunny"
-
 🚫 For **bot invite link** / "invite bot" / "add bot" questions — DO NOT give the old support server link.
-✅ Reply: "Invite me to your server: https://discord.com/oauth2/authorize?client_id=1540401487581020252&permissions=8&scope=bot%20applications.commands 🤖"`
+✅ Reply: "Invite me to your server: https://discord.com/oauth2/authorize?client_id=1540401487581020252&permissions=8&scope=bot%20applications.commands 🤖"${hileBlogu}`
   };
 
   return prompts[lang] || prompts.tr;
