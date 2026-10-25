@@ -169,6 +169,16 @@ const express = require("express");
 const crypto = require("crypto");
 const app = express();
 
+/* ÖLÇÜLEN EKSİK (2026-10-25):
+ *   `Helpers/rank-api.js` kullanıcı adı + avatar için
+ *   `req.app.locals.client` okuyor, AMA `app.locals.client` hiçbir yerde
+ *   atanmıyordu. Sonuç: `/api/rank/:id` her zaman `kullaniciAdi: ""` ve
+ *   `avatar: ""` dönerdi — launcher rozeti çizilir ama isim/avatar boş
+ *   kalırdı. Burada TEK satırla bağlıyoruz; başka hiçbir yerde
+ *   `app.locals` yazılmıyor (grep ile doğrulandı).
+ *   `client` (Discord.Client) 130. satırda tanımlı, burada hazır. */
+app.locals.client = client;
+
 app.get("/", (req, res) => { console.log("RiseBunny pinglendi."); res.sendStatus(200); });
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -1816,6 +1826,31 @@ app.get("/api/dogrula/:id", async (req, res) => {
     });
   } catch { res.status(500).json({ error: "hata" }); }
 });
+/* ── RANK UCU (SALT OKUNUR) ────────────────────────────────────────────────
+   /api/rank/:id -> { ok, rank, kullaniciAdi, avatar }
+
+   Neden modul: komut ve uclar ayni dosyada sisiyordu; rank mantigi
+   Helpers/rankler.js, HTTP yuzeyi Helpers/rank-api.js icinde duruyor.
+   Burada yalnizca BAGLIYORUZ.
+
+   GUVENLIK:
+     - _botAuth: x-bot-secret olmadan 401/404. Site disinda erisilemez.
+     - Yalnizca GET. Rank YALNIZCA `r!rank ver` (bot komutu) ile degisir;
+       HTTP'den rank dagitilamaz.
+     - Disari cikan alanlar: rank, kullaniciAdi, avatar. Discord ID listesi,
+       mod listesi, premium listesi, e-posta CIKMAZ.
+     - Bilinmeyen ID -> rank "user" (yetki yukseltmez), hata degil. */
+try {
+  const registerRankApi = require("./Helpers/rank-api");
+  const R = require("./Helpers/rankler");
+  registerRankApi(app, { _botAuth, R });
+  console.log("[rank] /api/rank/:id baglandi (salt okunur, _botAuth)");
+} catch (e) {
+  // Rank ucu baglanamazsa botun geri kalani CALISMAYA DEVAM ETMELI:
+  // rank gorsel bir ozellik, cekirdek islevi bloke etmemeli.
+  console.error("[rank] baglanamadi (bot calismaya devam ediyor):", e.message);
+}
+
 app.get("/api/kullanici/:id", async (req, res) => {
   try {
     const id = String(req.params.id || "").replace(/\D/g, "").slice(0, 20);

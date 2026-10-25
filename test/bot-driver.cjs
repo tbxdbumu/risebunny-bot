@@ -82,6 +82,12 @@ function express() {
   app.set = () => app;
   app.engine = () => app;
   app.Router = () => app;
+  /* Gercek Express'te `app.locals` her zaman bir nesnedir ve bot.js onu
+   * `app.locals.client = client` diye YAZAR (rank ucu kullanici adi/avatar
+   * icin okur). Stub'da tanimli olmadigi icin bot.js yuklenirken
+   * "Cannot set properties of undefined" atip YARIDA kaliyor, hicbir uc
+   * yakalanmiyordu (21 testin 18'i bos donuyordu). */
+  app.locals = {};
   return app;
 }
 express.json = () => (req, res, next) => next();
