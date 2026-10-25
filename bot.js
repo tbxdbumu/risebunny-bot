@@ -299,18 +299,23 @@ function _botAuth(req, res, next) {
 /* ── Launcher bilet doğrulaması (istemci yazma uçları için) ─────────────
    Site (api/launcher.js) `discordId.expEpochMs.HMAC-SHA256-hex` imzalar;
    istemci `Authorization: Bearer …` ile gönderir, site proxy'si yalnızca
-   /api/public/* için iletir. Bot AYNI sırla doğrular (TICKET_SECRET veya
-   SESSION_SECRET — Vercel'dekiyle birebir aynı değeri buraya da girin).
+   /api/public/* için iletir. Bot AYNI sırla doğrular (TICKET_SECRET —
+   Vercel'dekiyle birebir aynı değeri buraya da girin).
    Sır tanımlı DEĞİLSE istek REDDEDİLİR (fail-closed).
-   Eskiden `true` dönüyordu: TICKET_SECRET/SESSION_SECRET boşsa 22 yazma ucu
-   sadece discordId yazarak açılıyordu. Artık sır yoksa 503, bilet yoksa 401. */
-const TICKET_SECRET = process.env.TICKET_SECRET || process.env.SESSION_SECRET || "";
+   Eskiden `true` dönüyordu: sır boşsa 22 yazma ucu sadece discordId yazarak
+   açılıyordu. Artık sır yoksa 503, bilet yoksa 401.
+
+   NOT: SESSION_SECRET'a DÜŞME yok. Site tarafı (api/launcher.js) hâlâ
+   `TICKET_SECRET || SESSION_SECRET` yapıyor; burada düşülürse oturum imza
+   anahtarı bilet imza anahtarı olarak da kullanılmış olur (tek sır, iki iş).
+   Vercel'de ikisini de AYRI değerlerle tanımla. */
+const TICKET_SECRET = process.env.TICKET_SECRET || "";
 let _ticketUyariVerildi = false;
 function _ticketIzinli(req, res, discordId) {
   if (!TICKET_SECRET) {
     if (!_ticketUyariVerildi) {
       _ticketUyariVerildi = true;
-      console.error("[TICKET] TICKET_SECRET/SESSION_SECRET tanimli degil — launcher bilet uclari KAPALI (fail-closed).");
+      console.error("[TICKET] TICKET_SECRET tanimli degil — launcher bilet uclari KAPALI (fail-closed). SESSION_SECRET'a dusulmez; ayri bir TICKET_SECRET gir.");
     }
     res.status(503).json({ error: "launcher dogrulamasi yapilandirilmamis" });
     return false;
