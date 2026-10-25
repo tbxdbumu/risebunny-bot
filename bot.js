@@ -397,6 +397,25 @@ app.get("/api/user/:id", _botAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: "hata" }); }
 });
 
+/* ── PREMIUM BITISI (rank/site/launcher icin) ─────────────────────────
+   OLCULEN SORUN (2026-10-25): Site `api/rank/index.js` -> `premiumBitis()`
+   bu rotayi cagiriyordu ama ROTA YOKTU. Sonuc: her kullanici icin `0`
+   donuyordu, launcher `premium_bitis=0` gorup "PREMIUM YOK" diyordu.
+
+   Donen veri SADECE bitis zamanidir (unix ms). Discord kimligi, e-posta,
+   premium listesi DONMEZ — istek sahibi zaten `_botAuth` ile yetkili. */
+app.get("/api/launcher/premium/:id", _botAuth, async (req, res) => {
+  try {
+    const id = String(req.params.id || "").replace(/\D/g, "").slice(0, 20);
+    if (!id) return res.status(400).json({ error: "geçersiz id" });
+    const ham = db.fetch(`premium_${id}`);
+    const bitis = typeof ham === "number" ? ham : Number(ham) || 0;
+    const aktif = U.isPremium(id);
+    const kalan = bitis > Date.now() ? Math.ceil((bitis - Date.now()) / 86400000) : 0;
+    res.json({ ok: true, bitis, aktif, kalan });
+  } catch (e) { res.status(500).json({ error: "hata" }); }
+});
+
 const SHOP_CATALOG = {
   premium_30:  { tip: "premium", gun: 30, fiyat: 250000, ad: "💎 Premium 30 Gün" },
   pet_tavsan:  { tip: "pet", pet: { name: "Tavşan", emoji: "🐰", rarity: "common" }, fiyat: 72000, ad: "🐰 Tavşan" },
