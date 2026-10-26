@@ -179,6 +179,27 @@ module.exports = {
   aliases: ["ranklar", "rutbe"],
   aciklama: "Owner/Admin/Mod/Youtuber/User rank ver (bot yetkilisi)",
 
+  /* DİKKAT — bot.js yükleyici sözleşmesi:
+     `command.help.name` ve `command.run` ZORUNLU, yoksa komut atlanır:
+       if (!command?.help?.name || typeof command.run !== "function")
+         console.warn(`Atlandı: ${file} ...`)
+     Bu dosya eskiden yalnızca `ad`/`aciklama` alanlarını tanımlıyordu,
+     bu yüzden bot açılışta "Atlandı: rank.js" deyip komutu HİÇ
+     yüklemiyordu — `r!rank` çalışmıyordu. Aşağıdaki `help`/`conf`
+     alanları bu sözleşme için eklendi; mevcut `ad`/`aciklama` korundu. */
+  help: {
+    name: "rank",
+    description: "Owner/Admin/Mod/Youtuber/User rank ver (bot yetkilisi)",
+    usage: "rank [ver|al|liste|kim] ...",
+  },
+  conf: {
+    enabled: true,
+    guildOnly: true,
+    aliases: ["ranklar", "rutbe"],
+    permLevel: 0,
+    kategori: "bot",
+  },
+
   run: async (client, message, args) => {
     const alt = String(args[0] || "").toLowerCase();
 
