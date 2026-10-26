@@ -133,6 +133,11 @@ function onbellekYaz(guildId, harita) {
  * Sunucudaki davetleri Discord'dan çekip önbelleğe yazar.
  * Bot yeniden başladığında ilk üye katılımından önce çağrılmalı, yoksa
  * "önce/sonra" farkı hesaplanamaz (cache boş -> 0 - 0 = 0).
+ *
+ * DİKKAT: Başarısızlık SESSİZ olmamalı. Davetler çekilemiyorsa (botta
+ * "Davetleri Yönet" izni yok gibi) bunu loglamak gerekir; aksi halde
+ * sayaçların neden hep 0 kaldığı anlaşılmaz. Eskiden `catch {}` ile
+ * yutuluyordu.
  */
 async function onbellekYukle(guild) {
   if (!guild || !guild.invites) return false;
@@ -148,7 +153,11 @@ async function onbellekYukle(guild) {
     }
     onbellekYaz(guild.id, harita);
     return true;
-  } catch {
+  } catch (e) {
+    console.error(
+      `[Davet] "${guild.name || guild.id}" davetleri çekilemedi: ${e?.message || e}\n` +
+        `        → bottaki "Davetleri Yönet" (ManageGuild/ManageInvites) iznini kontrol et.`
+    );
     return false;
   }
 }
