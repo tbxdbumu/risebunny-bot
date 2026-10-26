@@ -1176,6 +1176,139 @@ Zayıf dilli ama **değerli** 6 kayıt silinmedi, metni düzeltildi:
 
 ---
 
+## 16. Davet takibi, presence, intent temizliği ve slash komutlar (v6)
+
+Bu turda dört ayrı bozukluk düzeltildi. Hiçbiri "iyileştirme" değil —
+**ölçülmüş çalışmayan özelliklerdi.**
+
+### 16.1 Davet sistemi tamamen ölüydü
+
+**Ölçüm:** `invites.<id>` anahtarı **üç yerde okunuyordu** ama bu anahtara
+**yazan tek satır kod yoktu**:
+
+| Yer | Ne okuyordu |
+|---|---|
+| `komutlar/rütbe-davetlerim.js` | `invites.<id>` → her zaman 0 |
+| `komutlar/rütbe-top.js` | `invites_<guildId>` → **hiç yazılmayan başka bir anahtar** |
+| `komutlar/çekiliş-şart.js` | `invites.<id>` → şart hiç sağlanamıyordu |
+
+Üstüne iki ayrı hata vardı:
+
+- `rütbe-bonus.js:26` içinde `global.onUpdateInvite(...)` çağrılıyordu. Bu
+  fonksiyon **hiçbir yerde tanımlı değildi** → her `r!bonus-ekle` çağrısı
+  `TypeError` ile çöküyordu.
+- `GuildInvites` intent'i istenmiyordu, `inviteCreate`/`inviteDelete`
+  dinlenmiyordu. Yani davet farkı hesaplanamıyordu.
+
+**Çözüm — `ai/davet.js` (tek kaynak):**
+
+- `GuildInvites` intent'i eklendi (**ayrıcalıklı değil**, portalda toggle
+  gerekmez).
+- Sunucu başına davet önbelleği: `kod → { uses, inviter }`.
+- `clientReady`'de tüm sunucuların davetleri yüklenir (yoksa ilk katılımlarda
+  `0 - 0` farkı çıkar ve kimse kaydedilmez).
+- `inviteCreate`/`inviteDelete` önbelleği canlı tutar.
+- `guildMemberAdd` → taze liste ile önbellek karşılaştırılır, **artan** davet
+  kullanılan davettir.
+- `guildMemberRemove` → `leave` sayacı artar (`davet_eden_<guild>_<üye>`
+  anahtarı üzerinden).
+
+**Veri biçimi** (`invites.<id>`):
+
+```
+{ total, regular, bonus, fake, leave, inviter }
+```
+
+- `fake`: 7 günden yeni hesaplar `total`'a **sayılmaz**, ayrı sayılır.
+- Toplam formülü **her yerde aynı**: `total + bonus`
+  (`r!davetlerim`, `r!davet-top`, `çekiliş-şart`, `giveawayEnded`).
+
+**Yan bulgu:** `croxydb.all()` nokta içeren anahtarları **iç içe nesne**
+döndürür — `db.set("invites.555", x)` sonrası `all()["invites.555"]` **yoktur**,
+`all().invites["555"]` vardır. `sirala()` ve `sofraSifirla()` buna göre yazıldı.
+
+**Düzeltilen dosyalar:** `ai/davet.js` (yeni), `bot.js`, `rütbe-davetlerim.js`,
+`rütbe-top.js`, `rütbe-bonus.js`, `rütbe-davetleri-sıfırla.js`,
+`rütbe-davetkanal.js`, `rütbe-davetkanalsıfırla.js`, `çekiliş-şart.js`.
+
+`rütbe-davetkanal.js` eskiden `settings.Channel` yazıyordu (tüm sunucular aynı
+anahtarı eziyordu, okuyanı da yoktu) → artık `davetkanal_<guildId>` ve
+katılımda bildirim gönderiliyor.
+
+### 16.2 `r!say` her zaman 0 gösteriyordu
+
+İki ayrı hata üst üste:
+
+1. `m.user.presence?.status` okunuyordu. discord.js v14'te presence
+   **`member.presence`** alanındadır; `user.presence` diye alan yoktur.
+2. `GuildPresences` intent'i hiç istenmiyordu → alan adı düzeltilse bile
+   alan hiç dolmazdı.
+
+**Çözüm:** `member.presence` kullanılıyor; presence verisi yoksa **0 uydurmak
+yerine "bilinmiyor"** yazıyor. `GuildPresences` bilinçli olarak **istenmiyor**:
+10.000+ kullanıcı eşiğinde gereksiz ayrıcalıklı intent istemek inceleme
+riskidir ve `r!say`'in tek fonksiyonu için gerekçe değil.
+
+### 16.3 Ölü intent'ler kaldırıldı
+
+| Intent | Neden kaldırıldı |
+|---|---|
+| `GuildVoiceStates` | repoda tek bir `voiceStateUpdate` yok (ölçüldü: 0) |
+| `GuildMessageReactions` | tek bir `messageReactionAdd/Remove` yok (ölçüldü: 0) |
+| `DirectMessages` | tüm mesaj işleyicileri `if (!message.guild) return` yapıyor (ölçüldü: 0 DM kontrolü) |
+
+Kalan ayrıcalıklı intent'ler: `GuildMembers` (üye/rol işlemleri şart),
+`MessageContent` (prefix komutlar şart). İkisi de gerekçelendirilebilir.
+
+### 16.4 Slash komutlar — kod tarafı hiç yoktu
+
+**Ölçüm:** Discord'da 8 komut görünüyordu ama kodda `SlashCommandBuilder`,
+`client.application.commands.set` ve `isChatInputCommand()` **hiç yoktu**.
+`events/interactionCreate.js` yalnızca buton/select/modal işliyordu. Yani 8
+komutun 8'i de "Bu komut yüklenemedi" veriyordu.
+
+**Çözüm — `ai/slash.js` (tek kaynak):**
+
+| Slash | Delege edildiği prefix komutu |
+|---|---|
+| `/daily` | `komutlar/gunluk.js` (`r!günlük`) |
+| `/help` | `komutlar/yardım.js` (`r!yardım`) |
+| `/language` | `komutlar/dil.js` (`r!dil`) |
+| `/level` | `komutlar/seviye.js` (`r!seviye`) |
+| `/ping` | `komutlar/ping.js` (`r!ping`) |
+| `/stats` | `komutlar/istatistik.js` (`r!istatistik`) |
+| `/balance` | `komutlar/param.js` (`r!param`) |
+| `/profile` | özel işleyici (`profil_<id>` kaydını gösterir) |
+
+- **İş mantığı tekrarlanmıyor:** slash komutları mevcut `run()` fonksiyonlarına
+  delege eder. Davet, para, XP, soft-ban gibi yan etkiler prefix ile birebir
+  aynıdır.
+- Prefix komutları `message` beklediği için ince bir "sahte message" kurulur;
+  `message.channel.send/reply` çıktısı etkileşime yönlenir.
+- `clientReady`'de `client.application.commands.set(...)` çağrılır. `.set()`
+  eski kayıtların **üzerine yazar** → karşılığı olmayan stale komutlar temizlenir.
+- Görünen ad/açıklama TR + EN yerelleştirmeli.
+- Onay kapısı slash'te de geçerli (`ai/slash.js` içinde, butonlarla aynı kural).
+- Bilinmeyen bir slash komutu gelirse sessizce düşmez: "Bilinmeyen komut" der.
+
+**Not:** `/profile` için prefix karşılığı yoktu. `profil_<id>` anahtarını
+`ai/handler.js` yazıyor. Kayıt yoksa uydurmuyor, "kayıtlı profil yok" diyor.
+
+### 16.5 Bu turun doğrulaması
+
+| Test | Sonuç |
+|---|---|
+| `davet-test.cjs` (yeni) | **30/30** |
+| `slash-test.cjs` (yeni) | **35/35** |
+| `test/bot-runtime-test.cjs` | **21/21** |
+| `test/bot-driver.cjs` | EXIT=0, hata yok |
+| `celiski-denetle.js` | **0 çelişki** |
+| `web-karar-test.js` | 41/41, parite 15/15 |
+| `dil-parite.js` | 0/18 uyumsuz |
+| `node --check` (12 dosya) | hepsi OK |
+
+---
+
 ## 12. Destek linkleri
 
 - **Site:** `https://risebunny.vercel.app/risebunny`

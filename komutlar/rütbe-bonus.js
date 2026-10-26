@@ -18,12 +18,20 @@ exports.run = async (client, message, args) => {
 
     var num = Number(args[1]);
     if(isNaN(num)) return message.reply((lang === "en" ? "Please Enter The Bonus Number." : "Lütfen Bonus Olacak Sayı Giriniz."));
-    const db = new Database("./Servers/" + message.guild.id, "Invites");
 
-    var bonus = (db.add(`invites.${victim.id}.bonus`, num) || 0), total = (db.get(`invites.${victim.id}.total`) || 0);
-    message.channel.send((lang === "en" ? `Around ${num} Bonus Added To ${victim}.` : `${victim} Adlı Kişiye ${num} Civarı Bonus Eklendi.`));
+    /* Bonus ai/davet.js üzerinden yazılır — davet verisi tek yerden
+       yönetilsin diye (r!davetlerim ve r!çekiliş-şart aynı biçimi okur).
+       ESKİ HATA: burada `global.onUpdateInvite(...)` çağrılıyordu ama o
+       fonksiyon HİÇBİR yerde tanımlı değildi; komut her seferinde
+       "TypeError: global.onUpdateInvite is not a function" ile çöküyordu. */
+    const D = require("../ai/davet");
+    const oncekiToplam = D.toplamGetir(victim.id);
+    const guncel = D.bonusEkle(victim.id, num);
+    const yeniToplam = guncel.total + guncel.bonus;
 
-    global.onUpdateInvite(victim, message.guild.id, total + bonus);
+    message.channel.send((lang === "en"
+      ? `Added **${num}** bonus invite(s) to ${victim}. Total: **${oncekiToplam} → ${yeniToplam}**.`
+      : `${victim} adlı kişiye **${num}** bonus davet eklendi. Toplam: **${oncekiToplam} → ${yeniToplam}**.`));
 };
 
 exports.conf = {

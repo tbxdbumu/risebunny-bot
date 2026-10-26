@@ -127,16 +127,34 @@ if (!Discord.EmbedBuilder.prototype.addField) {
   };
 }
 
+/* ── INTENT'LER ──────────────────────────────────────────────────────
+   Ayrıcalıklı (★) intent'leri yalnızca GERÇEKTEN kullanan kod varsa
+   istiyoruz: 2026 Haziran itibarıyla Discord, ayrıcalıklı intent
+   incelemesini 10.000+ benzersiz kullanıcıya ulaşan botlara uyguluyor ve
+   her yıl yeniden başvuru istiyor. Gerekçelendiremediğimiz intent'i
+   istemek incelemeyi riske atar.
+
+   Kaldırılanlar (2026-10-26 doğrulandı — hiç dinleyici yok):
+     • GuildVoiceStates      → repoda tek bir `voiceStateUpdate` yok
+     • GuildMessageReactions → tek bir `messageReactionAdd/Remove` yok
+     • DirectMessages        → tüm mesaj işleyicileri `if (!message.guild)`
+                               ile dönüyor; DM'de işlenecek komut yok
+
+   GuildPresences BİLEREK istenmiyor: r!say artık presence yoksa
+   "bilinmiyor" diyor (bkz. komutlar/say.js) ve r!kullanıcıbilgi zaten
+   `member.presence` üzerinden zarif düşüyor. */
 const client = new Discord.Client({
   intents: [
     Discord.GatewayIntentBits.Guilds,
-    Discord.GatewayIntentBits.GuildMembers,
+    Discord.GatewayIntentBits.GuildMembers,   // ★ ayrıcalıklı — üye olayları/rol işlemleri için şart
     Discord.GatewayIntentBits.GuildMessages,
-    Discord.GatewayIntentBits.MessageContent,
-    Discord.GatewayIntentBits.GuildVoiceStates,
-    Discord.GatewayIntentBits.GuildMessageReactions,
+    Discord.GatewayIntentBits.MessageContent, // ★ ayrıcalıklı — prefix komutlar için şart
     Discord.GatewayIntentBits.GuildModeration,
-    Discord.GatewayIntentBits.DirectMessages
+    /* Davet takibi (r!davetlerim / r!davet-top / r!çekiliş-şart --davet).
+       Ayrıcalıklı DEĞİL: portalda toggle gerekmez, sadece burada istemek
+       yeterli. Öncesinde hiç istenmiyordu; invites.<id> anahtarına yazan
+       kod da yoktu (bkz. ai/davet.js). */
+    Discord.GatewayIntentBits.GuildInvites
   ],
   partials: [Discord.Partials.Channel, Discord.Partials.Message, Discord.Partials.Reaction, Discord.Partials.GuildMember, Discord.Partials.User],
   allowedMentions: { parse: ["users", "roles"], repliedUser: true }
@@ -2387,6 +2405,27 @@ client.once("clientReady", () => {
     _lbSync();
     setInterval(_lbSync, 10 * 60 * 1000);
   }
+
+  /* ── Slash komutları kaydet ───────────────────────────────────────
+     `.set()` eski kayıtların üzerine yazar; kodda karşılığı olmayan
+     stale komutlar (hiç işleyicisi olmadığı için "yüklenemedi" verenler)
+     böylece temizlenir. Discorda global komut yayılımı birkaç dakika
+     sürebilir; ilk açılıştan sonra kalıcıdır. */
+  require("./ai/slash").kaydet(client).catch(() => {});
+
+  /* ── Davet önbelleğini doldur ──────────────────────────────────────
+     Üye katılımında "hangi davet kullanıldı" bilgisi, önbellekteki
+     kullanım sayısı ile taze sayının FARKINDAN bulunur. Önbellek boşsa
+     fark hesaplanamaz (0 - 0), ilk katılımlar kaydedilmez. Bot her
+     açılışta tüm sunucuların davetlerini bir kez yükler. */
+  (async () => {
+    const D = require("./ai/davet");
+    let ok = 0, hata = 0;
+    for (const [, g] of client.guilds.cache) {
+      if (await D.onbellekYukle(g)) ok++; else hata++;
+    }
+    console.log(`[Davet] Önbellek: ${ok} sunucu yüklendi${hata ? `, ${hata} başarısız (davet izni yok)` : ""}.`);
+  })().catch(() => {});
 });
 let _statsDeb = null;
 function queueStats(reason) {
@@ -2484,9 +2523,69 @@ client.on("guildDelete", async (guild) => {
   } catch {}
 });
 
+/* ── DAVET TAKİBİ ─────────────────────────────────────────────────────
+   `invites.<id>` anahtarına yazan kod daha önce HİÇ yoktu; r!davetlerim,
+   r!davet-top ve r!çekiliş-şart --davet N bu yüzden hep 0 görüyordu.
+   Takip ai/davet.js'te; burada yalnızca Discord olayları bağlanır.
+
+   Sıra önemli: inviteCreate/inviteDelete önbelleği canlı tutar, katılımda
+   "önce/sonra" farkı doğru hesaplanır. Bu dinleyiciler guildMemberAdd'ten
+   ÖNCE tanımlanır ama farklı olaylara bağlı oldukları için çakışmazlar. */
+client.on("inviteCreate", (invite) => {
+  try {
+    if (!invite?.guild) return;
+    require("./ai/davet").onbellekGuncelle(
+      invite.guild.id,
+      invite.code,
+      invite.uses || 0,
+      invite.inviterId || invite.inviter?.id || null
+    );
+  } catch {}
+});
+client.on("inviteDelete", (invite) => {
+  try {
+    if (!invite?.guild) return;
+    require("./ai/davet").onbellekSil(invite.guild.id, invite.code);
+  } catch {}
+});
+
+/* Üye katıldığında kimin davet ettiğini çöz. Diğer guildMemberAdd
+   dinleyicilerinden bağımsız çalışır (kendi try/catch'i var). */
+client.on("guildMemberAdd", async (member) => {
+  try {
+    if (!member?.guild || member.user?.bot) return;
+    const D = require("./ai/davet");
+    const sonuc = await D.katilimIsle(client, member);
+    if (!sonuc) return;
+    D.davetEdenKaydet(member.guild.id, member.id, sonuc.davetEden);
+    /* Davet kanalı ayarlandıysa oraya bildir (r!davet-kanal). */
+    const kanalId = (() => { try { return db.fetch(`davetkanal_${member.guild.id}`); } catch { return null; } })();
+    if (kanalId) {
+      const kanal = member.guild.channels.cache.get(kanalId);
+      if (kanal?.isTextBased()) {
+        const gl = getGuildLang(member.guild.id);
+        const toplam = D.toplamGetir(sonuc.davetEden);
+        kanal.send(
+          gl === "en"
+            ? `📨 **${member.user.username}** joined via **${sonuc.kod}** — <@${sonuc.davetEden}> now has **${toplam}** invite(s).`
+            : `📨 **${member.user.username}** \`${sonuc.kod}\` davetiyle katıldı — <@${sonuc.davetEden}> artık **${toplam}** davete sahip.`
+        ).catch(() => {});
+      }
+    }
+  } catch (e) {
+    console.error("[Davet] katılım:", e?.message || e);
+  }
+});
+
+client.on("guildMemberRemove", async (member) => {
+  try {
+    if (!member?.guild || member.user?.bot) return;
+    await require("./ai/davet").ayrilimIsle(client, member);
+  } catch {}
+});
+
 if (AI) {
-  client.on("messageCreate", async (message) => {
-    try {
+  client.on("messageCreate", async (message) => {    try {
       if (message.author.bot) return;
       if (!message.guild) return;
       if (typeof AI.adminEtiketKontrol === "function") {
@@ -2937,9 +3036,8 @@ client.giveawaysManager.on("giveawayEnded", async (giveaway, winners) => {
       let uygun = true;
       if (sart.rol && !member.roles.cache.has(sart.rol)) uygun = false;
       if (sart.davet > 0) {
-        const veri = db.fetch(`invites.${w.id}`) || {};
-        const toplam = (veri.total || 0) + (veri.bonus || 0);
-        if (toplam < sart.davet) uygun = false;
+        /* Davet verisi tek kaynaktan (ai/davet.js). */
+        if (require("./ai/davet").toplamGetir(w.id) < sart.davet) uygun = false;
       }
       if (uygun) uygunlar.push(w);
     }

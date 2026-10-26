@@ -1,34 +1,40 @@
 const Discord = require("discord.js");
-const Database = require("../Helpers/Database");
+const db = require("croxydb");
 const { getLangSync, t } = require("../dil");
-// exports.onLoad = (client) => {};
+
 /**
- * @param {Discord.Client} client 
- * @param {Discord.Message} message 
- * @param {Array<String>} args 
+ * r!davet-kanal-sıfırla — davet bildirim kanalını kapatır.
+ *
+ * ESKİ HATA: `db.set("settings")` değer vermeden çağrılıyordu; hiçbir ayarı
+ * temizlemiyordu (ve global "settings" anahtarını bozuyordu).
  */
-exports.run = async (client, message, args) => {
+exports.run = async (client, message) => {
   const lang = getLangSync(message.author.id);
-	  const db = new Database("./Servers/" + message.guild.id, "Settings");
-    if(!message.member.permissions.has(Discord.PermissionFlagsBits.Administrator) && !message.member.permissions.has(Discord.PermissionFlagsBits.ManageGuild)) return message.reply(t(lang, "sistem.yetkiYok"))
-    
-    var type = ["Channel"];
-    db.set(`settings`);
+  const EN = lang === "en";
 
-    message.reply((lang === "en" ? `Done.` : `Başarılı.`));
+  if (
+    !message.member.permissions.has(Discord.PermissionFlagsBits.Administrator) &&
+    !message.member.permissions.has(Discord.PermissionFlagsBits.ManageGuild)
+  ) {
+    return message.reply(t(lang, "sistem.yetkiYok"));
+  }
 
+  try { db.delete(`davetkanal_${message.guild.id}`); } catch {}
 
+  await message.channel
+    .send(EN ? "✅ Invite notifications disabled." : "✅ Davet bildirimleri kapatıldı.")
+    .catch(() => {});
 };
 
 exports.conf = {
   enabled: true,
-  guildOnly: false,
-  aliases: ["davetkanalsıfırla","davet-kanalsıfırla","davetkanal-sıfırla"],
-  permLevel: 0
+  guildOnly: true,
+  aliases: ["davetkanalsıfırla", "davet-kanalsıfırla", "davetkanal-sıfırla", "invite-channel-reset"],
+  permLevel: 0,
+  kategori: "davet",
 };
-
 exports.help = {
-  name: 'davet-kanal-sıfırla',
-  description: 'Bot adminlerinin bot üzerinde kod test etmesini sağlar.',
-  usage: 'eval <kod>'
+  name: "davet-kanal-sıfırla",
+  description: "Davet bildirim kanalını kapatır.",
+  usage: "davet-kanal-sıfırla",
 };

@@ -5,6 +5,20 @@ const db = require("croxydb");
 
 module.exports = async (interaction) => {
   try {
+    /* ── SLASH KOMUTLAR ─────────────────────────────────────────────
+       Bu blok EN BAŞTA olmalı: aşağıdaki onay kapısı buton/select için
+       yazılmış (`interaction.customId` okur, slash'te bu alan yoktur) ve
+       slash çağrıları `isButton()`/`isStringSelectMenu()` kontrollerinden
+       geçmemeli. Onay kontrolü ai/slash.js içinde ayrıca yapılıyor. */
+    if (interaction.isChatInputCommand?.()) {
+      const handled = await require("../ai/slash").isle(interaction);
+      if (handled) return;
+      /* Kayıtlı olmayan bir komut geldiyse sessizce düşmesin. */
+      return interaction
+        .reply({ content: `Bilinmeyen komut: /${interaction.commandName}`, ephemeral: true })
+        .catch(() => {});
+    }
+
     // Consent gate for interactions (buttons/selects) — allow language select, consent buttons, owner bypass
     if (interaction.isButton() || interaction.isStringSelectMenu()) {
       const { SAHIP_ID } = require("../utils");

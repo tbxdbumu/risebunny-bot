@@ -1,27 +1,40 @@
 const Discord = require("discord.js");
-const Database = require("../Helpers/Database");
 const { getLangSync, t } = require("../dil");
+const D = require("../ai/davet");
 
-
-exports.run = async (client, message, args) => {
+/**
+ * r!davetleri-sıfırla — sunucudaki tüm davet sayaçlarını siler.
+ *
+ * ESKİ HATA: `db2.set("invites")` değer VERMEDEN çağrılıyordu (bozuk kayıt
+ * yazıyordu) ve aslında hiçbir kullanıcının verisini silmiyordu.
+ */
+exports.run = async (client, message) => {
   const lang = getLangSync(message.author.id);
-    if(!message.member.permissions.has(Discord.PermissionFlagsBits.Administrator) && !message.member.permissions.has(Discord.PermissionFlagsBits.ManageGuild)) return message.reply("Yetkin Yok!");
+  const EN = lang === "en";
+  if (
+    !message.member.permissions.has(Discord.PermissionFlagsBits.Administrator) &&
+    !message.member.permissions.has(Discord.PermissionFlagsBits.ManageGuild)
+  ) {
+    return message.reply(t(lang, "sistem.yetkiYok"));
+  }
 
-    const db2 = new Database("./Servers/" + message.guild.id, "Invites");
-
-db2.set("invites")
-message.channel.send((lang === "en" ? "Invites Reset" : "Davetler Sıfırlandı"))
-}
+  const silinen = D.sofraSifirla(message.guild.id);
+  await message.channel.send(
+    EN
+      ? `✅ **${silinen}** invite record(s) reset.`
+      : `✅ **${silinen}** davet kaydı sıfırlandı.`
+  ).catch(() => {});
+};
 
 exports.conf = {
   enabled: true,
-  guildOnly: false,
-  aliases: [],
-  permLevel: 0
+  guildOnly: true,
+  aliases: ["reset-invites", "davetsıfırla"],
+  permLevel: 0,
+  kategori: "davet",
 };
 exports.help = {
-  name: 'davetleri-sıfırla',
-  description: 'Logo Yaparsınız',
-  usage: 'm-logo <yazı>'
+  name: "davetleri-sıfırla",
+  description: "Tüm davet sayaçlarını sıfırlar.",
+  usage: "davetleri-sıfırla",
 };
-

@@ -95,8 +95,10 @@ exports.run = async (client, message, args) => {
     if (!member || member.user.bot) return true;
     if (rolSarti && !member.roles.cache.has(rolSarti)) return true;
     if (davetSarti > 0) {
-      const veri = db.fetch(`invites.${member.id}`) || {};
-      if ((veri.total || 0) + (veri.bonus || 0) < davetSarti) return true;
+      /* Davet verisi tek kaynaktan (ai/davet.js). Önceden ham
+         `db.fetch("invites.<id>")` okunuyordu; o anahtara yazan kod
+         olmadığı için şart hiçbir zaman karşılanamıyordu. */
+      if (require("../ai/davet").toplamGetir(member.id) < davetSarti) return true;
     }
     return false;
   };
