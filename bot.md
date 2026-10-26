@@ -1249,16 +1249,15 @@ yerine "bilinmiyor"** yazıyor. `GuildPresences` bilinçli olarak **istenmiyor**
 10.000+ kullanıcı eşiğinde gereksiz ayrıcalıklı intent istemek inceleme
 riskidir ve `r!say`'in tek fonksiyonu için gerekçe değil.
 
-### 16.3 Ölü intent'ler kaldırıldı
+### 16.3 Intent temizliği — GERİ ALINDI (bkz. 16.6)
 
-| Intent | Neden kaldırıldı |
-|---|---|
-| `GuildVoiceStates` | repoda tek bir `voiceStateUpdate` yok (ölçüldü: 0) |
-| `GuildMessageReactions` | tek bir `messageReactionAdd/Remove` yok (ölçüldü: 0) |
-| `DirectMessages` | tüm mesaj işleyicileri `if (!message.guild) return` yapıyor (ölçüldü: 0 DM kontrolü) |
+~~Ölü intent'ler kaldırıldı: `GuildVoiceStates`, `GuildMessageReactions`,
+`DirectMessages`~~ → **Bu bir hataydı, 16.6'da geri alındı.**
 
-Kalan ayrıcalıklı intent'ler: `GuildMembers` (üye/rol işlemleri şart),
-`MessageContent` (prefix komutlar şart). İkisi de gerekçelendirilebilir.
+Kalan intent'ler (`GuildInvites` dahil) yerinde. Ayrıcalıklı intent'ler:
+`GuildMembers` (üye/rol işlemleri şart), `MessageContent` (prefix komutlar
+şart). `GuildPresences` bilinçli olarak **istenmiyor** — `r!say` presence
+yoksa "bilinmiyor" der, `r!kullanıcıbilgi` zaten zarif düşer.
 
 ### 16.4 Slash komutlar — kod tarafı hiç yoktu
 
@@ -1306,6 +1305,65 @@ komutun 8'i de "Bu komut yüklenemedi" veriyordu.
 | `web-karar-test.js` | 41/41, parite 15/15 |
 | `dil-parite.js` | 0/18 uyumsuz |
 | `node --check` (12 dosya) | hepsi OK |
+
+---
+
+## 16.6 Intent kaldırma hatası ve düzeltmesi (16.3'ün geri alınması)
+
+**Olay:** 16.3'te `GuildMessageReactions`, `GuildVoiceStates` ve
+`DirectMessages` intent'leri "ölü" sayılıp kaldırıldı. Bot Render'da
+açılışta çöktü:
+
+```
+Error: Client is missing the "GuildMessageReactions" intent.
+    at new GiveawaysManager (node_modules/discord-giveaways/src/Manager.js:41:19)
+    at Object.<anonymous> (/opt/render/project/src/bot.js:3011:27)
+==> No open ports detected, continuing to scan...
+```
+
+**Kök neden — YANLIŞ ÇIKARIM.** İntentleri kaldırmadan önce repoda
+`client.on("messageReactionAdd", ...)` arandı ve **0 sonuç** bulundu. Bundan
+"bu olay hiç kullanılmıyor" sonucu çıkarıldı. Bu yanlıştı: dinleyici kendi
+kodumuzda değil, **kütüphanenin içinde** olabilir.
+
+`discord-giveaways` tam olarak bunu yapıyor — `GiveawaysManager` yapıcı
+fonksiyonu intent'i kontrol edip fırlatıyor:
+
+```js
+if (!new Discord.IntentsBitField(client.options.intents).has(
+      Discord.IntentsBitField.Flags.GuildMessageReactions)) {
+  throw new Error('Client is missing the "GuildMessageReactions" intent.');
+}
+```
+
+**Kural (bu dosyaya kalıcı olarak yazıldı):** Bir intent'i kaldırmadan önce
+yalnızca kendi `client.on(...)` çağrılarına değil, **`node_modules` içinde o
+intent'i zorunlu tutan kütüphane olup olmadığına** da bakılmalı. `node --check`
+bu sınıf hatayı yakalamaz; hata modül yüklenirken, çalışma zamanında çıkar.
+
+**Düzeltme:** Üç intent de geri konuldu. `GuildVoiceStates` ve
+`DirectMessages` ayrıcalıklı **değildir** (portalda toggle gerekmez) ve ek
+maliyeti yoktur; ileride eklenecek bir kütüphane için açık kalmaları doğru.
+
+**Yeni test — `intent-calistirma-test.cjs`:**
+
+Bu test `bot.js`'i **gerçekten yükler** (salt `--check` değil), yakalanan
+intent bitfield'ını doğrular ve `GiveawaysManager`'ı gerçekten kurar. Ayrıca
+**negatif kontrol** içerir: intent olmadan kurulumun fırlattığını da doğrular,
+böylece testin gerçekten bir şey ölçtüğü kanıtlanır.
+
+> Not: Test proje kökünden çalıştırılmalı — `bot.js` göreli yol
+> (`./komutlar/`) kullanıyor.
+
+**16.6 doğrulaması:**
+
+| Test | Sonuç |
+|---|---|
+| `intent-calistirma-test.cjs` (yeni) | **11/11** |
+| `test/bot-runtime-test.cjs` | **21/21** |
+| `test/bot-driver.cjs` | EXIT=0 |
+| `davet-test.cjs` | **30/30** |
+| `slash-test.cjs` | **35/35** |
 
 ---
 

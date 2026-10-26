@@ -128,17 +128,28 @@ if (!Discord.EmbedBuilder.prototype.addField) {
 }
 
 /* ── INTENT'LER ──────────────────────────────────────────────────────
-   Ayrıcalıklı (★) intent'leri yalnızca GERÇEKTEN kullanan kod varsa
-   istiyoruz: 2026 Haziran itibarıyla Discord, ayrıcalıklı intent
-   incelemesini 10.000+ benzersiz kullanıcıya ulaşan botlara uyguluyor ve
-   her yıl yeniden başvuru istiyor. Gerekçelendiremediğimiz intent'i
-   istemek incelemeyi riske atar.
+   DİKKAT — 2026-10-26'da yapılan hata:
+   `GuildMessageReactions`, `GuildVoiceStates` ve `DirectMessages`
+   "ölü intent" sanılıp kaldırıldı çünkü repoda bu olayları dinleyen
+   kod yoktu (grep: 0 sonuç). Bu YANLIŞ bir çıkarımdı: dinleyici kendi
+   kodumuzda değil, KÜTÜPHANENİN İÇİNDE olabilir.
 
-   Kaldırılanlar (2026-10-26 doğrulandı — hiç dinleyici yok):
-     • GuildVoiceStates      → repoda tek bir `voiceStateUpdate` yok
-     • GuildMessageReactions → tek bir `messageReactionAdd/Remove` yok
-     • DirectMessages        → tüm mesaj işleyicileri `if (!message.guild)`
-                               ile dönüyor; DM'de işlenecek komut yok
+   `discord-giveaways` tam olarak bunu yapıyor — `GiveawaysManager`
+   yapıcı fonksiyonunda intent'i kontrol edip fırlatıyor:
+     throw new Error('Client is missing the "GuildMessageReactions" intent.')
+   Sonuç: bot Render'da açılışta çöktü, port açılmadı.
+
+   KURAL: bir intent'i kaldırmadan önce `node_modules` içinde onu
+   ZORUNLU tutan kütüphane olup olmadığı aranmalı. Sadece kendi
+   `client.on(...)` çağrılarına bakmak yetmez.
+
+   Bu yüzden üçü de geri konuldu. `GuildVoiceStates` ve `DirectMessages`
+   ayrıcalıklı DEĞİLDİR (portalda toggle gerekmez), ek maliyeti yoktur;
+   ileride eklenecek bir kütüphane/özellik için açık kalmaları doğru.
+
+   Ayrıcalıklı (★) intent'ler yalnızca GERÇEKTEN kullanıldığında
+   isteniyor: 2026 Haziran itibarıyla Discord ayrıcalıklı intent
+   incelemesini 10.000+ benzersiz kullanıcıya uyguluyor.
 
    GuildPresences BİLEREK istenmiyor: r!say artık presence yoksa
    "bilinmiyor" diyor (bkz. komutlar/say.js) ve r!kullanıcıbilgi zaten
@@ -149,6 +160,10 @@ const client = new Discord.Client({
     Discord.GatewayIntentBits.GuildMembers,   // ★ ayrıcalıklı — üye olayları/rol işlemleri için şart
     Discord.GatewayIntentBits.GuildMessages,
     Discord.GatewayIntentBits.MessageContent, // ★ ayrıcalıklı — prefix komutlar için şart
+    /* discord-giveaways `GiveawaysManager` bu intent olmadan fırlatıyor. */
+    Discord.GatewayIntentBits.GuildMessageReactions,
+    Discord.GatewayIntentBits.GuildVoiceStates,
+    Discord.GatewayIntentBits.DirectMessages,
     Discord.GatewayIntentBits.GuildModeration,
     /* Davet takibi (r!davetlerim / r!davet-top / r!çekiliş-şart --davet).
        Ayrıcalıklı DEĞİL: portalda toggle gerekmez, sadece burada istemek
