@@ -165,7 +165,7 @@ const KOMUTLAR = {
   "çekiliş-liste": { kat: "cekilis", en: "giveaway-list", enAlias: ["gliste"] },
   "öneri": { kat: "genel", en: "suggest", enAlias: ["idea"] },
   "üyedurum": { kat: "genel", en: "member-count", enAlias: ["members"] },
-  "seviye": { kat: "seviye", en: "level", enAlias: ["rank", "xp"] },
+  "seviye": { kat: "seviye", en: "level", enAlias: ["xp"] },
   "seviye-ödül": { kat: "seviye", en: "level-reward", enAlias: ["levelrewards"] },
   "seviye-sıralama": { kat: "seviye", en: "level-top", enAlias: ["levelsiralama", "leveltop", "seviyetop"] },
   "günlük-ödül": { kat: "ekonomi", en: "daily-streak", enAlias: ["streak"] },

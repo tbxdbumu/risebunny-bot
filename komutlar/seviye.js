@@ -81,5 +81,11 @@ exports.run = async (client, message, args) => {
   await message.channel.send({ files: [kart] });
 };
 
-exports.conf = { enabled: true, guildOnly: true, aliases: ["level", "rank", "xp", "seviyem"], permLevel: 0, kategori: "seviye" };
+/* DİKKAT — alias çakışması:
+   Eskiden burada "rank" da vardı: ["level", "rank", "xp", "seviyem"].
+   Ama ayrı bir `rank` komutu da var (komutlar/rank.js). "rank" alias'ı,
+   `dil/komutlar.js`'teki `seviye: { enAlias: ["rank"] }` tanımıyla
+   birleşince `r!rank` yazan kullanıcı SEVİYE komutunu çalıştırıyordu.
+   `rank` alias'ı kaldırıldı; seviye için `level`, `xp`, `seviyem` yeterli. */
+exports.conf = { enabled: true, guildOnly: true, aliases: ["level", "xp", "seviyem"], permLevel: 0, kategori: "seviye" };
 exports.help = { name: "seviye", description: "Seviyeni ve XP kartını gösterir.", usage: "seviye [@kullanıcı]" };
