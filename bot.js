@@ -353,16 +353,6 @@ function _botAuth(req, res, next) {
  * ───────────────────────────────────────────────────────────────────────── */
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: false, limit: "2mb" }));
-app.use((err, req, res, next) => {
-  if (!err) return next();
-  const durum = err.status || err.statusCode || 400;
-  if (!res.headersSent) {
-    res.status(durum).json({
-      error: durum === 413 ? "gövde çok büyük" : "gövde okunamadı",
-      detay: String((err && err.message) || err).slice(0, 160)
-    });
-  }
-});
 
 /* ── Launcher bilet doğrulaması (istemci yazma uçları için) ─────────────
    Site (api/launcher.js) `discordId.expEpochMs.HMAC-SHA256-hex` imzalar;
@@ -2511,6 +2501,25 @@ function queueStats(reason) {
   clearTimeout(_statsDeb);
   _statsDeb = setTimeout(() => postStats(reason), 60 * 1000);
 }
+
+/* ── GÖVDE AYRIŞTIRMA HATASI — ROTA LİSTESİNİN SONUNDA (2026-10-27) ──────
+ * Express'te hata ara katmanı (4 argümanlı) KENDİNDEN SONRA tanımlanan
+ * rotalara da hizmet eder; ama ÖNCE tanımlanırsa o rotaların
+ * `express.json()` hatası buraya DÜŞMEZ — varsayılan Express işleyicisi
+ * devreye girer ve HTML döner. Canlıda ölçtük: bozuk JSON gövdesi
+ *   <pre>Bad Request</pre>   (Content-Type: text/html)
+ * dönüyordu. İstemci (RisebunnyApi.istek) `json()` beklediği için sebep
+ * görünmüyordu. Bu yüzden ara katman, TÜM rotalardan SONRA kurulur.
+ * ───────────────────────────────────────────────────────────────────────── */
+app.use((err, req, res, next) => {
+  if (!err) return next();
+  const durum = err.status || err.statusCode || 400;
+  if (res.headersSent) return next(err);
+  res.status(durum).json({
+    error: durum === 413 ? "gövde çok büyük" : "gövde okunamadı",
+    detay: String((err && err.message) || err).slice(0, 160)
+  });
+});
 
 const PORT = process.env.PORT || 8000;
 app.listen(PORT, () => {
