@@ -329,6 +329,41 @@ function _botAuth(req, res, next) {
   next();
 }
 
+/* ── GOVDE AYRISTIRMA — TEK KATMAN (2026-10-27) ───────────────────────────
+ * ÖLÇÜLEN KÖK NEDEN (canlı, gerçek launcher biletiyle):
+ *
+ *   POST /api/public/vote  {"configId":…,"discordId":…}  -> 400
+ *        <pre>Bad Request</pre>            (Content-Type: text/html — Express)
+ *   POST /api/public/vote  {}                             -> 400 {"error":"eksik alan"}
+ *   POST /api/public/vote  (gövde yok)                    -> 400 {"error":"eksik alan"}
+ *   POST /api/public/vote  Content-Type: application/vnd.api+json -> <pre>Bad Request</pre>
+ *   POST /api/public/vote  Content-Type: text/plain       -> {"error":"eksik alan"}
+ *
+ * Yani gövde VARSA rotadaki `express.json()` patlıyor, gövde YOKSA route
+ * çalışıyor. Sonuç: sitede atılan HER yorum/beğeni ve config yükleme
+ * sessizce düşüyordu — kullanıcının "beğeni/yorum görünmüyor" şikâyeti.
+ *
+ * Rotalarda `express.json()` tek tek çağrılıyordu (vote/upload/edit/delete/
+ * buy/coupon…). Aynı ayrıştırıcıyı yedi ayrı yerde tekrarlamak yerine BURADA,
+ * tek yerde kuruyoruz; rota içindeki `express.json()` çağrıları zaten
+ * ayrıştırılmış gövdeye dokunmadan geçer (idempotent).
+ *
+ * Ayrıca ayrıştırma HATASI artık HTML değil JSON döner: istemci
+ * (RisebunnyApi.istek) `json()` bekliyor, HTML alınca sebebi görünmüyordu.
+ * ───────────────────────────────────────────────────────────────────────── */
+app.use(express.json({ limit: "2mb" }));
+app.use(express.urlencoded({ extended: false, limit: "2mb" }));
+app.use((err, req, res, next) => {
+  if (!err) return next();
+  const durum = err.status || err.statusCode || 400;
+  if (!res.headersSent) {
+    res.status(durum).json({
+      error: durum === 413 ? "gövde çok büyük" : "gövde okunamadı",
+      detay: String((err && err.message) || err).slice(0, 160)
+    });
+  }
+});
+
 /* ── Launcher bilet doğrulaması (istemci yazma uçları için) ─────────────
    Site (api/launcher.js) `discordId.expEpochMs.HMAC-SHA256-hex` imzalar;
    istemci `Authorization: Bearer …` ile gönderir, site proxy'si yalnızca
@@ -798,6 +833,21 @@ app.post("/api/public/vote", express.json(), (req, res) => {
       cfg.oylar.push(discordId); voted = true;
     }
     try { db.set("configler", liste); } catch {}
+    /* SAHİP LOG (2026-10-26): oylar görünür olsun.
+       (2026-10-27) Oy GERİ ALMA da düşüyor: önceden yalnızca `voted` için
+       log yazılıyordu, kullanıcı beğenisini geri aldığında sahip hiçbir şey
+       görmüyordu ("beğeni sayısı düştü ama log'da yok"). */
+    if (voted) {
+      U.ownerLog(client, new Discord.EmbedBuilder().setColor("#EB459E")
+        .setTitle("⭐ Config beğenildi")
+        .setDescription(`**Config:** \`${cfg.ad}\` (\`${cfg.id}\`)\n**Beğenen:** <@${discordId}>\n**Toplam oy:** ${cfg.oylar.length}`)
+        .setTimestamp()).catch(() => {});
+    } else {
+      U.ownerLog(client, new Discord.EmbedBuilder().setColor("#95A5A6")
+        .setTitle("💔 Config beğenisi geri alındı")
+        .setDescription(`**Config:** \`${cfg.ad}\` (\`${cfg.id}\`)\n**Geri alan:** <@${discordId}>\n**Toplam oy:** ${cfg.oylar.length}`)
+        .setTimestamp()).catch(() => {});
+    }
     res.json({ ok: true, id: configId, votes: cfg.oylar.length, voted });
   } catch { res.status(500).json({ error: "hata" }); }
 });
@@ -953,6 +1003,14 @@ app.post("/api/public/upload", express.json({ limit: "1mb" }), async (req, res) 
        (Discord gidişi yavaşsa istemci 8-10 sn'de timeout'a düşüyor ve
        yükleme aslında başarılı olsa da "Failed to publish" görünüyordu.) */
     res.json({ ok: true, id: cfg.id, durum: cfg.durum, message: "Yüklemeniz onay bekliyor." });
+    /* SAHİP LOG (kullanıcı isteği 2026-10-26: "her şey sahip log'a düşsün").
+       Yüklemenin onay mesajına ek olarak kısa bir özet sahip log kanalına
+       düşer: kim, hangi config, kaç bayt. Onay kararı AYRICA verilir
+       (cfgOnayaGonder butonları); bu yalnızca görünürlük kaydıdır. */
+    U.ownerLog(client, new Discord.EmbedBuilder().setColor("#57F287")
+      .setTitle("📤 Config yüklendi (istemci)")
+      .setDescription(`**Config:** \`${ad}\` (\`${cfg.id}\`)\n**Yükleyen:** <@${discordId}> (\`${username}\`)\n**Boyut:** ${(bayt / 1024).toFixed(1)} KB\n**Durum:** onay bekliyor`)
+      .setTimestamp()).catch(() => {});
     cfgOnayaGonder(client, cfg).then(gonderilen => {
       if (!gonderilen) return;
       const l2 = tumConfigler();
@@ -1072,6 +1130,12 @@ app.post("/api/public/edit", express.json({ limit: "1mb" }), (req, res) => {
     if (!cfg.at) cfg.at = Date.now();
     cfg.guncellendi = Date.now();
     kaydetListe(liste);
+    /* SAHİP LOG (2026-10-26): güncellemeler görünür olsun. Önce yalnızca
+       başarılı bir yanıt dönüyordu ve sahip değişikliği göremiyordu. */
+    U.ownerLog(client, new Discord.EmbedBuilder().setColor("#FEE75C")
+      .setTitle("✏️ Config güncellendi (istemci)")
+      .setDescription(`**Config:** \`${cfg.ad}\` (\`${cfg.id}\`)\n**Güncelleyen:** <@${discordId}>\n**İçerik yazıldı:** ${icerikYazildi ? "evet" : "hayır (değişiklik yok)"}\n**Boyut:** ${(Number(cfg.boyut || 0) / 1024).toFixed(1)} KB`)
+      .setTimestamp()).catch(() => {});
     res.json({
       ok: true, id: configId, name: cfg.ad, description: cfg.not || "",
       icerikYazildi, boyut: Number(cfg.boyut) || 0, guncellendi: cfg.guncellendi
