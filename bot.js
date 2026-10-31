@@ -1962,6 +1962,36 @@ try {
   console.error("[rank] baglanamadi (bot calismaya devam ediyor):", e.message);
 }
 
+/* ── RiseBunny panel köprüsü ─────────────────────────────────────────────
+   Minecraft projesinden TAMAMEN ayrı: `panel-kopru.js` yalnızca Discord
+   kimliği, premium durumu ve panelin "bağlı / günlük seri" kaydını yönetir.
+   Ekonomi, pelerin, pet uçlarına dokunmaz.
+
+   `fbCreds` yok; premium bilgisi mevcut `_premiumJson` (crovydb
+   `premium_<id>` + `U.isPremium`) ve `/api/launcher/premium/:id` ile aynı
+   kaynaktan okunur. `premiumOf` bunları birleştirir. */
+try {
+  const registerPanelApi = require("./panel-kopru.js");
+  const startPanelApi = typeof registerPanelApi === "function" ? registerPanelApi : registerPanelApi.registerPanelApi;
+  startPanelApi(app, {
+    db,
+    client,
+    _botAuth,
+    premiumOf: async (id) => {
+      try {
+        const p = _premiumJson(id);
+        const bitis = Number(db.fetch(`premium_${id}`) || 0);
+        return { premium: !!p.premium, daysLeft: Number(p.daysLeft) || 0, bitis };
+      } catch {
+        return { premium: false, daysLeft: 0, bitis: 0 };
+      }
+    },
+  });
+  console.log("[panel] /api/panel/* köprüsü bağlandı (Minecraft projesinden bağımsız)");
+} catch (e) {
+  console.error("[panel] köprü bağlanamadı (bot çalışmaya devam ediyor):", e.message);
+}
+
 app.get("/api/kullanici/:id", async (req, res) => {
   try {
     const id = String(req.params.id || "").replace(/\D/g, "").slice(0, 20);
