@@ -96,6 +96,10 @@ function createPanel({ db, client, premiumOf }) {
     } catch { /* premium okunamadı: ücretsiz kabul */ }
     const role = String(db.fetch(`siterol_${id}`) || pre.role || "member");
     const hash = avatarHashOf(kimlik?.avatar);
+    /* ALAN ADLARI: site tarafi (lib/_launcher.js -> panelSession) bu karti
+       dogrudan okuyor; premium.active ve premium.daysLeft ZORUNLU.
+       daysLeft === -1 = suresiz / yetkili. */
+    const daysLeft = pre.daysLeft === -1 ? -1 : Number(pre.daysLeft) || 0;
     return {
       ok: true,
       id,
@@ -104,11 +108,11 @@ function createPanel({ db, client, premiumOf }) {
       avatarHash: hash,
       avatarUrl: hash ? `/api/panel/avatar?h=${hash}` : `/api/panel/avatar?id=${id}`,
       premium: {
-        active: !!pre.premium || pre.daysLeft === -1,
-        daysLeft: pre.daysLeft === -1 ? -1 : Number(pre.daysLeft) || 0,
+        active: !!pre.premium || daysLeft === -1,
+        daysLeft,
         paidUntil: pre.bitis ? new Date(Number(pre.bitis)).toISOString() : null,
         role,
-        staff: role !== "member" || pre.daysLeft === -1,
+        staff: role !== "member" || daysLeft === -1,
       },
       stats: {
         firstSeen: rec.firstSeen,
