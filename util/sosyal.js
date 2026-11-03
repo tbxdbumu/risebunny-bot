@@ -15,8 +15,9 @@
  *     } ]
  *
  * YOUTUBE
- *   API anahtarı (YOUTUBE_API_KEY) varsa Data API v3, yoksa
- *   `https://www.youtube.com/feeds/videos.xml?channel_id=...` RSS'i kullanılır.
+ *   Varsayılan: kanal RSS'i (`youtube.com/feeds/videos.xml`) — KOTASIZ, API anahtarı gerekmez.
+ *   Opsiyonel: `YOUTUBE_API_KEY` + `YOUTUBE_USE_API=1` → Data API v3 `search.list`.
+ *   (Search API ücretsiz kotası günde 100 çağrı; varsayılan RSS bu yüzden tercih edilir.)
  */
 const db = require("croxydb");
 const { getLangSync, t } = require("../dil");
@@ -24,6 +25,25 @@ const { getLangSync, t } = require("../dil");
 const ANAHTAR = (gid) => `sosyal.${gid}`;
 const SURE_MS = 5 * 60 * 1000; // 5 dakika
 const MAX_BILDIRIM = 3;        // tur başına en fazla
+
+/* ── YouTube kotası koruması ────────────────────────────────────────────
+ * Search API ücretsiz kotası: günde 100 `search.list` çağrısı.
+ * 5 dk'da bir tarama = 288 çağrı/gün → kota 1. günde biter.
+ * Bu yüzden YouTube taramaları en fazla 25 DAKİKADA bir yapılır
+ * (≈58 çağrı/gün). RSS ise kotasız, o her turda taranır.
+ */
+const YT_ARALIK_MS = 25 * 60 * 1000;
+const ytSonTaramalar = new Map(); // guildId → { kaynakId: ts }
+
+function ytTaramaZamani(gid, kaynakId) {
+  const m = ytSonTaramalar.get(gid) || {};
+  return m[kaynakId] || 0;
+}
+function ytTaramaIsaretle(gid, kaynakId) {
+  const m = ytSonTaramalar.get(gid) || {};
+  m[kaynakId] = Date.now();
+  ytSonTaramalar.set(gid, m);
+}
 
 function listele(gid) {
   const l = db.fetch(ANAHTAR(gid));
@@ -142,19 +162,25 @@ async function youtubeKanalId(kaynak) {
 /** YouTube → en yeni videolar (API varsa API, yoksa RSS). */
 async function youtubeVideolar(kanalId) {
   const apiKey = process.env.YOUTUBE_API_KEY;
-  if (apiKey) {
+
+  /* Kota tasarrufu: kanal RSS'i (kotasız) genelde yeterli.
+     API yalnızca YOUTUBE_USE_API=1 ise kullanılır. */
+  const apiKullan = apiKey && process.env.YOUTUBE_USE_API === "1";
+
+  if (apiKullan) {
     const url = `https://www.googleapis.com/youtube/v3/search?key=${apiKey}` +
       `&channelId=${encodeURIComponent(kanalId)}&part=snippet&order=date&maxResults=5&type=video`;
     const metin = await getir(url);
     if (metin) {
       try {
         const j = JSON.parse(metin);
-        return (j.items || []).map(i => ({
+        const liste = (j.items || []).map(i => ({
           id: i.id?.videoId,
           baslik: i.snippet?.title,
           link: i.id?.videoId ? `https://www.youtube.com/watch?v=${i.id.videoId}` : "",
           tarih: i.snippet?.publishedAt
         })).filter(o => o.id);
+        if (liste.length) return liste;
       } catch { /* RSS'e düş */ }
     }
   }
@@ -208,6 +234,12 @@ async function tara(client) {
       const kanal = guild.channels.cache.get(kayit.kanalId) ||
         await guild.channels.fetch(kayit.kanalId).catch(() => null);
       if (!kanal) continue;
+
+      // YouTube: kota koruması (en fazla 25 dk'da bir)
+      if (kayit.tur === "youtube") {
+        if (Date.now() - ytTaramaZamani(gid, kayit.id) < YT_ARALIK_MS) continue;
+        ytTaramaIsaretle(gid, kayit.id);
+      }
 
       let yeni;
       try { yeni = await yeniOgren(kayit); }
