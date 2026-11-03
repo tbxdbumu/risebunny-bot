@@ -12,6 +12,11 @@ module.exports = async (member) => {
     // Ayrılan üyenin kayıt akışı askıda kalmasın: bekleyen kayıt bayrağını temizle
     const bekleyen = db.fetch(`kayıtBekleyen_${member.guild.id}_${member.id}`);
     if (bekleyen) db.delete(`kayıtBekleyen_${member.guild.id}_${member.id}`);
+
+    /* Otomasyon: ayrılma tetiği (kanal bilgisi olmadan) */
+    require("../util/automation")
+      .calistir(member.client, member.guild, "ayrilma", { uye: member })
+      .catch(() => {});
   } catch (e) {
     console.warn("[guildMemberRemove]", e?.message || e);
   }

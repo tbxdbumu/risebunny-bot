@@ -169,7 +169,11 @@ const client = new Discord.Client({
        Ayrıcalıklı DEĞİL: portalda toggle gerekmez, sadece burada istemek
        yeterli. Öncesinde hiç istenmiyordu; invites.<id> anahtarına yazan
        kod da yoktu (bkz. ai/davet.js). */
-    Discord.GatewayIntentBits.GuildInvites
+    Discord.GatewayIntentBits.GuildInvites,
+    /* Yeni sistemler (tepki rol / starboard / sosyal uyarı / otomasyon).
+       Webhooks: sosyal uyarıların kendi avatar+isimle yazması ve embed
+       builder'ın "bot mesajı gibi" düzenlenmesi için. Ayrıcalıklı değil. */
+    Discord.GatewayIntentBits.GuildWebhooks
   ],
   partials: [Discord.Partials.Channel, Discord.Partials.Message, Discord.Partials.Reaction, Discord.Partials.GuildMember, Discord.Partials.User],
   allowedMentions: { parse: ["users", "roles"], repliedUser: true }
@@ -197,6 +201,15 @@ U.startPremiumSweeper(client);
 if (typeof U.startKuponSweeper === "function") U.startKuponSweeper(client);
 try { U.migrateKuponFlags(); } catch {}
 if (typeof U.startHatirlatSweeper === "function") U.startHatirlatSweeper(client);
+
+/* ── Yeni özellik sweep'leri (hata botun açılmasını engellemez) ───────── */
+const _sweep = (ad, fn) => {
+  try { fn(); } catch (e) { console.warn(`[sweeper:${ad}]`, e?.message || e); }
+};
+_sweep("starboard", () => require("./util/starboard").starboardIsit(client));
+_sweep("sayac", () => require("./util/sayac").startSayacSweeper(client));
+_sweep("dogum", () => require("./util/dogum").startDogumSweeper(client));
+_sweep("sosyal", () => require("./util/sosyal").startSosyalSweeper(client));
 
 const express = require("express");
 const crypto = require("crypto");
@@ -1962,6 +1975,36 @@ try {
   console.error("[rank] baglanamadi (bot calismaya devam ediyor):", e.message);
 }
 
+/* ── RiseBunny panel köprüsü ─────────────────────────────────────────────
+   Minecraft projesinden TAMAMEN ayrı: `panel-kopru.js` yalnızca Discord
+   kimliği, premium durumu ve panelin "bağlı / günlük seri" kaydını yönetir.
+   Ekonomi, pelerin, pet uçlarına dokunmaz.
+
+   `fbCreds` yok; premium bilgisi mevcut `_premiumJson` (crovydb
+   `premium_<id>` + `U.isPremium`) ve `/api/launcher/premium/:id` ile aynı
+   kaynaktan okunur. `premiumOf` bunları birleştirir. */
+try {
+  const registerPanelApi = require("./panel-kopru.js");
+  const startPanelApi = typeof registerPanelApi === "function" ? registerPanelApi : registerPanelApi.registerPanelApi;
+  startPanelApi(app, {
+    db,
+    client,
+    _botAuth,
+    premiumOf: async (id) => {
+      try {
+        const p = _premiumJson(id);
+        const bitis = Number(db.fetch(`premium_${id}`) || 0);
+        return { premium: !!p.premium, daysLeft: Number(p.daysLeft) || 0, bitis };
+      } catch {
+        return { premium: false, daysLeft: 0, bitis: 0 };
+      }
+    },
+  });
+  console.log("[panel] /api/panel/* köprüsü bağlandı (Minecraft projesinden bağımsız)");
+} catch (e) {
+  console.error("[panel] köprü bağlanamadı (bot çalışmaya devam ediyor):", e.message);
+}
+
 app.get("/api/kullanici/:id", async (req, res) => {
   try {
     const id = String(req.params.id || "").replace(/\D/g, "").slice(0, 20);
@@ -2834,7 +2877,7 @@ async function hosgeldinKart(member, ayrildiMi) {
     const izinler = kanal.permissionsFor?.(guild.members.me);
     if (izinler && !izinler.has("SendMessages")) return;
 
-    const dil = (id) => { try { return getGuildLang(id); } catch { return "tr"; } };
+    const dil = (id) => { try { return getGuildLang(id); } catch { return "en"; } };
     const EN = dil(guild.id) === "en";
 
     // Avatar adresi her durumda erişilebilir bir PNG olsun (gif/webp değil)

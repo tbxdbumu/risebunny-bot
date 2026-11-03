@@ -189,6 +189,34 @@ const KOMUTLAR = {
   "günlük-bonus": { kat: "premium", en: "daily-bonus", enAlias: ["premium-bonus"] },
   "launcher": { kat: "sahip", en: "launcher-status", enAlias: ["launcherinfo"] },
   "sayac": { kat: "genel", en: "counter", enAlias: ["livecount"] },
+
+  /* ── Rol sistemi (tepki rol, toplu rol) ── */
+  "tepkirol": { kat: "rol", en: "reaction-role", enAlias: ["rr", "reactionrole"] },
+  "toplurol": { kat: "rol", en: "bulk-role", enAlias: ["bulkrole", "bulk-roles"] },
+
+  /* ── Starboard ── */
+  "starboard": { kat: "starboard", en: "starboard", enAlias: ["sb", "starboard-ayarla"] },
+
+  /* ── Seviye / XP ayarı ── */
+  "seviye-ayar": { kat: "seviye", en: "xp-ayar", enAlias: ["level-settings", "seviyeayar"] },
+
+  /* ── Doğum günü ── */
+  "doğumgünü": { kat: "dogum", en: "birthday", enAlias: ["dogumgunu", "dg"] },
+
+  /* ── Ticket transkripti ── */
+  "ticket-transcript": { kat: "ticket", en: "ticket-transcript", enAlias: ["ticket-log", "transcript"] },
+
+  /* ── Embed oluşturucu ── */
+  "embed": { kat: "duyuru", en: "embed", enAlias: ["embed-olustur", "duyuru-olustur", "embedbuilder"] },
+
+  /* ── Otomasyon ── */
+  "otomasyon": { kat: "otomasyon", en: "automation", enAlias: ["automations", "otomasyon-kural"] },
+
+  /* ── Geçici ses ── */
+  "ses-hub": { kat: "ses", en: "voice-hub", enAlias: ["gecici-ses", "tmpvoice"] },
+
+  /* ── Sosyal bildirimler ── */
+  "sosyal": { kat: "sosyal", en: "social", enAlias: ["bildirim", "youtube-bildirim"] },
 };
 
 const KATEGORILER = [
@@ -210,6 +238,13 @@ const KATEGORILER = [
   { id: "site", emoji: "🔗", tr: "Site", en: "Website" },
   { id: "sahip", emoji: "👑", tr: "Sahip", en: "Owner" },
   { id: "seviye", emoji: "🏆", tr: "Seviye", en: "Level" },
+  { id: "rol", emoji: "🎭", tr: "Rol Sistemi", en: "Roles" },
+  { id: "starboard", emoji: "⭐", tr: "Starboard", en: "Starboard" },
+  { id: "dogum", emoji: "🎂", tr: "Doğum Günü", en: "Birthdays" },
+  { id: "duyuru", emoji: "📣", tr: "Duyuru", en: "Announcements" },
+  { id: "otomasyon", emoji: "⚙️", tr: "Otomasyon", en: "Automations" },
+  { id: "ses", emoji: "🔊", tr: "Ses Kanalları", en: "Voice" },
+  { id: "sosyal", emoji: "🔔", tr: "Sosyal", en: "Social" },
   { id: "yardim", emoji: "❓", tr: "Yardım", en: "Help" },
 ];
 

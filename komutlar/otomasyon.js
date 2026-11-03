@@ -1,328 +1,232 @@
-const { EmbedBuilder, PermissionFlagsBits, ChannelType } = require("discord.js");
-const db = require("croxydb");
+/**
+ * komutlar/otomasyon.js — Otomasyon kuralları (MEE6 Automations)
+ *
+ *   r!otomasyon                                      → kural listesi
+ *   r!otomasyon yeni <tetik> <ad...>                 → kural oluştur
+ *   r!otomasyon tetik <id> <tetik>
+ *   r!otomasyon kosul <id> icerir <metin>
+ *   r!otomasyon kosul <id> esit <metin>
+ *   r!otomasyon kosul <id> regex <ifade>
+ *   r!otomasyon kosul <id> kanal #kanal
+ *   r!otomasyon kosul <id> rol @rol
+ *   r!otomasyon kosul <id> temizle
+ *   r!otomasyon eylem <id> mesaj [#kanal] <metin>
+ *   r!otomasyon eylem <id> dm <metin>
+ *   r!otomasyon eylem <id> rol-ver @rol | rol-al @rol
+ *   r!otomasyon eylem <id> tepki <emoji>
+ *   r!otomasyon eylem <id> sil | kilit
+ *   r!otomasyon eylem <id> sil-<n>                   → n. eylemi kaldır
+ *   r!otomasyon aç|kapat <id>
+ *   r!otomasyon bilgi <id>
+ *   r!otomasyon sil <id>
+ *
+ * Tetikler: mesaj | katilim | ayrilma | rol-verildi | ses-katilim
+ * Değişkenler: {kullanici} {kullaniciAdi} {sunucu} {kanal} {mesaj} {sayi}
+ */
+const { EmbedBuilder, PermissionFlagsBits } = require("discord.js");
 const { getLangSync, t } = require("../dil");
-const { isPremium, SAHIP_ID, ownerLog } = require("../utils");
-const { ticketKategorisiniGarantiEt } = require("./ticket");
+const oto = require("../util/automation");
 
-/* Kategori çözümle: etiket > ham ID > otomatik kurulum.
-   Ticket sistemi kurulu değilse kategoriyi direkt oluşturur. */
-async function kategoriCoz(message, lang, gid, txt) {
-  // 1. Etiket
-  let kg = message.mentions.channels.find(c => c.type === ChannelType.GuildCategory) || null;
-  if (kg) return { kategori: kg, otomatik: false };
-  // 2. Ham ID (örn: 123456789012345678)
-  const idAday = String(txt || "").replace(/\D/g, "");
-  if (idAday) {
-    const aday = message.guild.channels.cache.get(idAday) || await message.guild.channels.fetch(idAday).catch(() => null);
-    if (aday && aday.type === ChannelType.GuildCategory) return { kategori: aday, otomatik: false };
-    return { hata: true };
-  }
-  // 3. ID de yoksa: ticket sistemi kurulu değilse direkt otomatik kur
-  const kayitliId = db.fetch(`ticket_kategori.${gid}`);
-  const kayitli = kayitliId ? (message.guild.channels.cache.get(kayitliId) || await message.guild.channels.fetch(kayitliId).catch(() => null)) : null;
-  if (kayitli && kayitli.type === ChannelType.GuildCategory) return { kategori: kayitli, otomatik: false };
-  const olusan = await ticketKategorisiniGarantiEt(message.guild);
-  if (olusan) return { kategori: olusan, otomatik: true };
-  return { hata: true };
-}
+const TETIK_ESLE = {
+  "mesaj": "mesaj", "message": "mesaj",
+  "katilim": "katilim", "katılım": "katilim", "join": "katilim", "giris": "katilim",
+  "ayrilma": "ayrilma", "ayrılma": "ayrilma", "leave": "ayrilma", "cikis": "ayrilma",
+  "rol-verildi": "rol_verildi", "rol_verildi": "rol_verildi", "role": "rol_verildi",
+  "ses-katilim": "ses_katilim", "ses_katilim": "ses_katilim", "voice": "ses_katilim"
+};
 
-/* Otomasyon durumunu döndürür; kuran premiumu bitmişse DURAKLAT (veri silinmez). */
-function otomasyonDurum(guildId) {
-  const kayit = db.fetch(`otomasyon_${guildId}`);
-  if (!kayit || !kayit.aktif) return null;
-  if (kayit.kuran !== SAHIP_ID && !isPremium(kayit.kuran)) {
-    if (!kayit.duraklatildi) {
-      kayit.duraklatildi = true;
-      try { db.set(`otomasyon_${guildId}`, kayit); } catch {}
-    }
-    return { ...kayit, bitmis: true };
-  }
-  if (kayit.duraklatildi) {
-    kayit.duraklatildi = false;
-    try { db.set(`otomasyon_${guildId}`, kayit); } catch {}
-  }
-  return kayit;
-}
-exports.otomasyonDurum = otomasyonDurum;
-
-function sunucuSayilari(gid) {
-  const all = db.all() || {};
-  let soru = 0, cevapsiz = 0;
-  for (const k of Object.keys(all)) {
-    if (k.startsWith(`otoegitim_${gid}_`)) soru++;
-    if (k.startsWith(`otocevapsiz_${gid}_`)) cevapsiz++;
-  }
-  return { soru, cevapsiz };
-}
-
-function kanalAdi(guild, id, varsayilan) {
-  const c = id ? guild.channels.cache.get(id) : null;
-  return c ? `${c}` : varsayilan;
-}
-
-/* Sunucu modlog kanalına yazar (ayarlıysa, sessizce atlar) */
-function modlogGonder(guild, icerik) {
-  try {
-    if (!guild) return;
-    const cfg = db.fetch(`otomasyon_${guild.id}`);
-    if (!cfg?.modlogKanal) return;
-    const kanal = guild.channels.cache.get(cfg.modlogKanal);
-    if (!kanal?.isTextBased()) return;
-    kanal.send(icerik).catch(() => {});
-  } catch (hata_72) { console.error("[KOMUT HATASI] komutlar\otomasyon.js:72 (yakalanan iç hata) | " + ((hata_72 && hata_72.name) || "Error") + ": " + ((hata_72 && hata_72.message) || hata_72)); console.error(String((hata_72 && hata_72.stack) || "").split("\n").slice(0, 5).join("\n")); }
-}
-exports.modlogGonder = modlogGonder;
+const EYLEM_ESLE = {
+  "mesaj": "mesaj", "message": "mesaj",
+  "dm": "dm",
+  "rol-ver": "rol_ver", "rol_ver": "rol_ver", "rolver": "rol_ver",
+  "rol-al": "rol_al", "rol_al": "rol_al", "rolal": "rol_al",
+  "tepki": "tepki", "reaction": "tepki",
+  "sil": "sil", "delete": "sil",
+  "kilit": "kilit", "lock": "kilit"
+};
 
 exports.run = async (client, message, args) => {
   const lang = getLangSync(message.author.id);
-  if (!message.guild) return;
-  if (!message.member.permissions.has(PermissionFlagsBits.Administrator))
-    return message.reply(t(lang, "ortak.yoneticiGerek")).catch(() => {});
-
-  // 💎 Premium kontrol (sahip muaf)
-  if (message.author.id !== SAHIP_ID && !isPremium(message.author.id)) {
-    const e = new EmbedBuilder().setColor("Gold")
-      .setTitle(t(lang, "otomasyon.aktif"))
-      .setDescription(t(lang, "ortak.premiumGerek"));
-    return message.reply({ embeds: [e] }).catch(() => {});
-  }
-
-  const sub = (args[0] || "").toLowerCase();
   const gid = message.guild.id;
+  if (!message.member.permissions.has(PermissionFlagsBits.ManageGuild))
+    return message.reply(t(lang, "otomasyon.yetki"));
 
-  // --- Kapat: çalışmayı durdurur, VERİLER DURUR ---
-  if (sub === "kapat" || sub === "off" || sub === "durdur" || sub === "stop") {
-    const kayit = db.fetch(`otomasyon_${gid}`);
-    if (!kayit?.aktif) return message.reply(t(lang, "otomasyon.durumYok")).catch(() => {});
-    if (kayit.duraklatildi) {
-      return message.reply(t(lang, "otomasyon.durumDuraklatildi")).catch(() => {});
+  const alt = (args[0] || "").toLowerCase();
+  const id = (args[1] || "").trim();
+
+  /* ── tamamı / liste ─────────────────────────────────────────────────── */
+  if (!alt || ["liste", "list"].includes(alt)) {
+    const liste = oto.kurallar(gid);
+    if (!liste.length) {
+      return message.reply({
+        embeds: [new EmbedBuilder().setColor("#ee7621")
+          .setTitle(t(lang, "otomasyon.baslik"))
+          .setDescription(t(lang, "otomasyon.bos"))
+          .addFields({ name: t(lang, "otomasyon.kullanimBaslik"), value: t(lang, "otomasyon.kullanim") })]
+      });
     }
-    kayit.aktif = false;
-    kayit.kapatanId = message.author.id;
-    kayit.kapatmaTarihi = Date.now();
-    try { db.set(`otomasyon_${gid}`, kayit); } catch {}
-    try { ownerLog(client, `🤖 **Otomasyon kapatıldı (veriler duruyor):** **${message.guild.name}** (${gid}) — ${message.author.tag} (<@${message.author.id}>)`).catch(() => {}); } catch {}
-    try { modlogGonder(message.guild, t(lang, "otomasyon.kapatildiDurur")); } catch {}
-    return message.reply(t(lang, "otomasyon.kapatildiDurur") + `\n\n💡 ${t(lang, "otomasyon.acKullanim")}`).catch(() => {});
+    const satirlar = liste.slice(0, 25).map(k =>
+      `${k.acik === false ? "⏸️" : "▶️"} \`${k.id}\` **${k.ad}** — ${t(lang, `otomasyon.tetik_${k.tetik}`)} • ${(k.eylemler || []).length} ${t(lang, "otomasyon.eylemKisa")} • ${k.sayac || 0}x`);
+    return message.reply({
+      embeds: [new EmbedBuilder().setColor("#ee7621")
+        .setTitle(t(lang, "otomasyon.baslik"))
+        .setDescription(satirlar.join("\n").slice(0, 3900))
+        .setFooter({ text: t(lang, "otomasyon.listeFt", { n: liste.length, max: oto.MAX_KURAL }) })]
+    });
   }
 
-  // --- Devam ettir: kapatılmış otomasyonu yeniden açar (veriler korunur) ---
-  // Not: kayıt yoksa kurulum akışına düşer (aşağıdaki "Aç / kurulum" bloğu).
-  if ((sub === "aç" || sub === "ac" || sub === "devam" || sub === "resume" || sub === "başlat" || sub === "baslat")
-      && db.fetch(`otomasyon_${gid}`)) {
-    const kayit = db.fetch(`otomasyon_${gid}`);
-    if (kayit.aktif && !kayit.duraklatildi) return message.reply(t(lang, "otomasyon.zatenKurulu", { sayi: sunucuSayilari(gid).soru })).catch(() => {});
-    if (kayit.kuran !== SAHIP_ID && !isPremium(kayit.kuran)) return message.reply(t(lang, "ortak.premiumGerek")).catch(() => {});
-    kayit.aktif = true;
-    kayit.duraklatildi = false;
-    kayit.acanId = message.author.id;
-    kayit.acmaTarihi = Date.now();
-    try { db.set(`otomasyon_${gid}`, kayit); } catch {}
-    try { ownerLog(client, `🤖 **Otomasyon yeniden açıldı:** **${message.guild.name}** (${gid}) — ${message.author.tag} (<@${message.author.id}>)`).catch(() => {}); } catch {}
-    try { modlogGonder(message.guild, t(lang, "otomasyon.devamEdiyor")); } catch {}
-    return message.reply(t(lang, "otomasyon.devamEdiyor")).catch(() => {});
+  /* ── yeni ───────────────────────────────────────────────────────────── */
+  if (["yeni", "ekle", "new", "create"].includes(alt)) {
+    const tetikHam = (args[1] || "").toLowerCase();
+    const tetik = TETIK_ESLE[tetikHam];
+    if (!tetik) return message.reply(t(lang, "otomasyon.tetikHata"));
+    const ad = args.slice(2).join(" ").slice(0, 80) || t(lang, `otomasyon.tetik_${tetik}`);
+    const kural = oto.ekle(gid, { ad, tetik, kosul: {}, eylemler: [] });
+    if (!kural) return message.reply(t(lang, "otomasyon.limit", { n: oto.MAX_KURAL }));
+    return message.reply({
+      embeds: [oto.kuralEmbed(kural, message.guild, lang)
+        .setFooter({ text: t(lang, "otomasyon.yeniFt", { id: kural.id }) })]
+    });
   }
 
-  // --- Veri sil: TÜM otomasyon verilerini kalıcı siler ---
-  if ((sub === "veri" && (args[1] || "").toLowerCase() === "sil") || sub === "verisil" || sub === "veri-sil") {
-    try {
-      const all = db.all() || {};
-      let n = 0;
-      for (const k of Object.keys(all)) {
-        if (k.startsWith(`otoegitim_${gid}_`) || k.startsWith(`otocevapsiz_${gid}_`)) { try { db.delete(k); n++; } catch {} }
-      }
-      db.delete(`otomasyon_${gid}`);
-    } catch {}
-    try { ownerLog(client, `🗑️ **Otomasyon verileri silindi:** **${message.guild.name}** (${gid}) — ${message.author.tag} (<@${message.author.id}>)`).catch(() => {}); } catch {}
-    return message.reply(t(lang, "otomasyon.veriSilOk")).catch(() => {});
+  if (!id) return message.reply(t(lang, "otomasyon.idGerek"));
+  const kural = oto.bul(gid, id);
+  if (!kural) return message.reply(t(lang, "otomasyon.kuralYok"));
+
+  /* ── bilgi ──────────────────────────────────────────────────────────── */
+  if (["bilgi", "info", "goster", "göster"].includes(alt)) {
+    return message.reply({ embeds: [oto.kuralEmbed(kural, message.guild, lang)] });
   }
 
-  // --- Durum ---
-  if (sub === "durum" || sub === "status") {
-    const durum = otomasyonDurum(gid);
-    if (!durum) return message.reply(t(lang, "otomasyon.durumYok")).catch(() => {});
-    if (durum.bitmis) {
-      await message.channel.send(t(lang, "otomasyon.duraklatildi")).catch(() => {});
-      try { ownerLog(client, `🤖 **Otomasyon duraklatıldı (premium bitti, veriler duruyor):** **${message.guild.name}** (${gid}) — kuran: <@${durum.kuran}>`).catch(() => {}); } catch {}
-      try { modlogGonder(message.guild, t(lang, "otomasyon.duraklatildi")); } catch {}
-      return;
+  /* ── aç / kapat ────────────────────────────────────────────────────── */
+  if (["aç", "ac", "on", "kapat", "off", "kapa"].includes(alt)) {
+    const acik = ["aç", "ac", "on"].includes(alt);
+    oto.guncelle(gid, id, { acik });
+    return message.reply(acik ? t(lang, "otomasyon.acik") : t(lang, "otomasyon.kapali"));
+  }
+
+  /* ── sil ───────────────────────────────────────────────────────────── */
+  if (["sil", "kaldır", "kaldir", "delete"].includes(alt)) {
+    oto.sil(gid, id);
+    return message.reply(t(lang, "otomasyon.silindi"));
+  }
+
+  /* ── tetik değiştir ────────────────────────────────────────────────── */
+  if (["tetik", "trigger"].includes(alt)) {
+    const tetik = TETIK_ESLE[(args[2] || "").toLowerCase()];
+    if (!tetik) return message.reply(t(lang, "otomasyon.tetikHata"));
+    const g = oto.guncelle(gid, id, { tetik });
+    return message.reply({ embeds: [oto.kuralEmbed(g, message.guild, lang)] });
+  }
+
+  /* ── koşul ─────────────────────────────────────────────────────────── */
+  if (["koşul", "kosul", "if", "kosullar"].includes(alt)) {
+    const tur = (args[2] || "").toLowerCase();
+    const deger = args.slice(3).join(" ").trim();
+    const kosul = { ...(kural.kosul || {}) };
+
+    if (["temizle", "sıfırla", "sifirla", "clear"].includes(tur)) {
+      const g = oto.guncelle(gid, id, { kosul: {} });
+      return message.reply({ embeds: [oto.kuralEmbed(g, message.guild, lang)] });
     }
-    const { soru, cevapsiz } = sunucuSayilari(gid);
-    const kanal = kanalAdi(message.guild, durum.noAnswerKanal, "-");
-    const kat = durum.ticketKategori ? kanalAdi(message.guild, durum.ticketKategori, "-") : "-";
-    const mlog = durum.modlogKanal ? kanalAdi(message.guild, durum.modlogKanal, "-") : "-";
-    const d = durum.duraklatildi ? t(lang, "otomasyon.durumDuraklatildi") : t(lang, "otomasyon.durumAktif");
-    return message.reply(t(lang, "otomasyon.durumVar", { durum: d, sayi: soru, cevapsiz, kanal, kategori: kat }) + `\nModlog: ${mlog}`).catch(() => {});
-  }
-
-  // --- Kanal: r!otomasyon kanal #x (no-answer kanalı) ---
-  if (sub === "kanal" || sub === "channel" || sub === "cevapsiz" || sub === "cevapsız") {
-    const durum = otomasyonDurum(gid);
-    if (!durum || durum.bitmis) return message.reply(t(lang, "otomasyon.onceAc")).catch(() => {});
-    const kanal = message.mentions.channels.find(c => c.isTextBased?.());
-    if (!kanal) return message.reply(t(lang, "otomasyon.ayarKanalYok")).catch(() => {});
-    const kayit = db.fetch(`otomasyon_${gid}`) || {};
-    kayit.noAnswerKanal = kanal.id;
-    try { db.set(`otomasyon_${gid}`, kayit); } catch {}
-    try { ownerLog(client, `📋 **Otomasyon no-answer kanalı:** **${message.guild.name}** (${gid}) — ${message.author.tag} — #${kanal.name}`).catch(() => {}); } catch {}
-    return message.reply(t(lang, "otomasyon.kanalOk", { kanal: `${kanal}` })).catch(() => {});
-  }
-
-  // --- Ayar: r!otomasyon ayar #kanal #kategori [#modlog] ---
-  if (sub === "ayar" || sub === "settings" || sub === "ayarla") {
-    const durum = otomasyonDurum(gid);
-    if (!durum || durum.bitmis) return message.reply(t(lang, "otomasyon.onceAc")).catch(() => {});
-    const metinKanallar = [...message.mentions.channels.filter(c => c.isTextBased?.()).values()];
-    const kanal = metinKanallar[0];
-    const modlog = metinKanallar[1] || null;
-    if (!kanal) return message.reply(t(lang, "otomasyon.ayarKanalYok")).catch(() => {});
-    const katCozum = await kategoriCoz(message, lang, gid, args.slice(1).join(" "));
-    if (katCozum.hata || !katCozum.kategori) return message.reply(t(lang, "otomasyon.kategoriIdYok")).catch(() => {});
-    const kategori = katCozum.kategori;
-    const kayit = db.fetch(`otomasyon_${gid}`) || {};
-    kayit.noAnswerKanal = kanal.id;
-    kayit.ticketKategori = kategori.id;
-    if (modlog) kayit.modlogKanal = modlog.id;
-    try { db.set(`otomasyon_${gid}`, kayit); } catch {}
-    try { ownerLog(client, `⚙️ **Otomasyon ayar:** **${message.guild.name}** (${gid}) — ${message.author.tag} — no-answer: #${kanal.name}, kategori: ${kategori.name}${modlog ? `, modlog: #${modlog.name}` : ""}`).catch(() => {}); } catch {}
-    try { modlogGonder(message.guild, t(lang, "otomasyon.ayarOk", { kanal: `${kanal}`, kategori: `${kategori}` })); } catch {}
-    if (katCozum.otomatik) await message.channel.send(t(lang, "ticket.kategoriOtomatik", { kategori: `${kategori}` })).catch(() => {});
-    return message.reply(t(lang, "otomasyon.ayarOk", { kanal: `${kanal}`, kategori: `${kategori}` })).catch(() => {});
-  }
-
-  // --- Öğret / Soru ekle: r!otomasyon öğret soru | cevap ---
-  if (sub === "öğret" || sub === "ogret" || sub === "teach" || sub === "ekle" || sub === "add" || sub === "soru" || sub === "soruekle" || sub === "soru-ekle") {
-    const durum = otomasyonDurum(gid);
-    if (!durum) return message.reply(t(lang, "otomasyon.onceAc")).catch(() => {});
-    if (durum.bitmis) {
-      await message.channel.send(t(lang, "otomasyon.duraklatildi")).catch(() => {});
-      try { ownerLog(client, `🤖 **Otomasyon duraklatıldı (premium bitti):** **${message.guild.name}** (${gid})`).catch(() => {}); } catch {}
-      return;
+    if (["icerir", "içerir", "contains"].includes(tur)) {
+      if (!deger) return message.reply(t(lang, "otomasyon.degerGerek"));
+      kosul.icerir = deger.slice(0, 200);
+      delete kosul.esit; delete kosul.regex;
+    } else if (["esit", "eşit", "equals"].includes(tur)) {
+      if (!deger) return message.reply(t(lang, "otomasyon.degerGerek"));
+      kosul.esit = deger.slice(0, 200);
+      delete kosul.icerir; delete kosul.regex;
+    } else if (["regex", "desen"].includes(tur)) {
+      if (!deger) return message.reply(t(lang, "otomasyon.degerGerek"));
+      try { new RegExp(deger); } catch { return message.reply(t(lang, "otomasyon.regexHata")); }
+      kosul.regex = deger.slice(0, 200);
+      delete kosul.icerir; delete kosul.esit;
+    } else if (["kanal", "channel"].includes(tur)) {
+      const kanal = message.mentions.channels.first();
+      if (!kanal) return message.reply(t(lang, "otomasyon.kanalGerek"));
+      kosul.kanalId = kanal.id;
+    } else if (["rol", "role"].includes(tur)) {
+      const rol = message.mentions.roles.first();
+      if (!rol) return message.reply(t(lang, "otomasyon.rolGerek"));
+      kosul.rolId = rol.id;
+    } else {
+      return message.reply(t(lang, "otomasyon.kosulKullanim"));
     }
-    const ham = args.slice(1).join(" ");
-    // "soru ekle" yazıldıysa ikinci kelimeyi atla
-    const temiz = ham.replace(/^(soru|ekle)\s+/i, "");
-    const ayrac = temiz.indexOf("|");
-    if (ayrac < 0) return message.reply(t(lang, "otomasyon.kullanimOgret")).catch(() => {});
-    const soru = temiz.slice(0, ayrac).trim().slice(0, 500);
-    const cevap = temiz.slice(ayrac + 1).trim().slice(0, 2000);
-    if (!soru || !cevap) return message.reply(t(lang, "otomasyon.ikisiGerek")).catch(() => {});
-    const id = `oto_${Date.now().toString(36)}_${Math.random().toString(36).substr(2, 6)}`;
-    db.set(`otoegitim_${gid}_${id}`, { soru, cevap, ekleyen: message.author.id, tarih: Date.now() });
-    try { ownerLog(client, `🧠 **Otomasyon eğitim** (<@${message.author.id}> ${message.author.tag}) — **${message.guild.name}** (${gid})\n❓ ${soru.slice(0, 300)}\n💡 ${cevap.slice(0, 500)}`).catch(() => {}); } catch {}
-    try { modlogGonder(message.guild, `🧠 **Eğitim eklendi** (<@${message.author.id}>)\n❓ ${soru.slice(0, 300)}`); } catch {}
-    return message.reply(t(lang, "otomasyon.ogretOk", { soru })).catch(() => {});
+
+    const g = oto.guncelle(gid, id, { kosul });
+    return message.reply({ embeds: [oto.kuralEmbed(g, message.guild, lang)] });
   }
 
-  // --- Aç / kurulum ---
-  const mevcut = db.fetch(`otomasyon_${gid}`);
-  // Zaten kuruluysa tekrar kurulamaz
-  if (mevcut?.aktif && !mevcut.duraklatildi) {
-    const { soru } = sunucuSayilari(gid);
-    return message.reply(t(lang, "otomasyon.zatenKurulu", { sayi: soru }) + `\n\n💡 **${t(lang, "otomasyon.ogretKullanim")}**\n\`r!otomasyon öğret soru | cevap\``).catch(() => {});
-  }
-  // Duraklatılmışsa ve premium yenilenmişse devam et
-  if (mevcut?.aktif && mevcut.duraklatildi) {
-    const durum = otomasyonDurum(gid);
-    if (durum && !durum.bitmis) {
-      return message.reply(t(lang, "otomasyon.devamEdiyor")).catch(() => {});
+  /* ── eylem ─────────────────────────────────────────────────────────── */
+  if (["eylem", "aksiyon", "action"].includes(alt)) {
+    const eylemAd = (args[2] || "").toLowerCase();
+    const kalan = args.slice(3).join(" ").trim();
+
+    // eylem sil-<n>
+    const silEsle = /^sil[-_](\d+)$/.exec(eylemAd);
+    if (silEsle) {
+      const n = parseInt(silEsle[1], 10);
+      const eylemler = [...(kural.eylemler || [])];
+      if (!eylemler[n - 1]) return message.reply(t(lang, "otomasyon.eylemYok"));
+      eylemler.splice(n - 1, 1);
+      const g = oto.guncelle(gid, id, { eylemler });
+      return message.reply({ embeds: [oto.kuralEmbed(g, message.guild, lang)] });
     }
-    return message.reply(t(lang, "otomasyon.duraklatildi")).catch(() => {});
+
+    const tur = EYLEM_ESLE[eylemAd];
+    if (!tur) return message.reply(t(lang, "otomasyon.eylemHata"));
+
+    const eylemler = [...(kural.eylemler || [])];
+    if (eylemler.length >= oto.MAX_EYLEM)
+      return message.reply(t(lang, "otomasyon.eylemLimit", { n: oto.MAX_EYLEM }));
+
+    let yeniEylem = null;
+    if (tur === "mesaj") {
+      const kanal = message.mentions.channels.first();
+      const metin = args.slice(3)
+        .filter(a => !a.startsWith("<#"))
+        .join(" ")
+        .replace(/\\n/g, "\n")
+        .trim();
+      if (!metin) return message.reply(t(lang, "otomasyon.metinGerek"));
+      yeniEylem = { tur, metin: metin.slice(0, 2000), ...(kanal ? { kanalId: kanal.id } : {}) };
+    } else if (tur === "dm") {
+      if (!kalan) return message.reply(t(lang, "otomasyon.metinGerek"));
+      yeniEylem = { tur, metin: kalan.replace(/\\n/g, "\n").slice(0, 2000) };
+    } else if (tur === "rol_ver" || tur === "rol_al") {
+      const rol = message.mentions.roles.first();
+      if (!rol) return message.reply(t(lang, "otomasyon.rolGerek"));
+      if (rol.position >= message.guild.members.me.roles.highest.position)
+        return message.reply(t(lang, "toplurol.rolYuksek", { rol: rol.name }));
+      yeniEylem = { tur, rolId: rol.id };
+    } else if (tur === "tepki") {
+      const emoji = args[3] && /^(<a?:[a-zA-Z0-9_~]+:\d+>|.{1,4})$/u.test(args[3]) ? args[3] : null;
+      if (!emoji) return message.reply(t(lang, "tepkirol.emojiGerek"));
+      yeniEylem = { tur, emoji };
+    } else {
+      yeniEylem = { tur };
+    }
+
+    eylemler.push(yeniEylem);
+    const g = oto.guncelle(gid, id, { eylemler });
+    return message.reply({ embeds: [oto.kuralEmbed(g, message.guild, lang)] });
   }
 
-  const metinKanallar = [...message.mentions.channels.filter(c => c.isTextBased?.()).values()];
-  const kanal = metinKanallar[0] || null;
-  const modlogIlk = metinKanallar[1] || null;
-  const kategori = message.mentions.channels.find(c => c.type === ChannelType.GuildCategory) || null;
-
-  // İnteraktif kurulum: önce eğitim sorusu, sonra cevabı
-  db.set(`otomasyon_${gid}`, { aktif: false, kuran: message.author.id, tarih: Date.now(), noAnswerKanal: kanal?.id || null, ticketKategori: kategori?.id || null, modlogKanal: modlogIlk?.id || null, kurulumAsama: "soru" });
-  try { ownerLog(client, `🤖 **Otomasyon kurulum başladı:** **${message.guild.name}** (${gid}) — kuran: <@${message.author.id}> ${message.author.tag}`).catch(() => {}); } catch {}
-  await message.channel.send(t(lang, "otomasyon.kurulumSoru")).catch(() => {});
-
-  const filter = m => m.author.id === message.author.id;
-  const collector = message.channel.createMessageCollector({ filter, time: 10 * 60 * 1000 });
-  const state = { asama: "soru", soru: "", kanal: kanal?.id || null, kategori: kategori?.id || null, modlog: modlogIlk?.id || null };
-  collector.on("collect", async m => {
-    try {
-      const txt = m.content.trim();
-      if (["iptal", "cancel", "vazgeç", "vazgec"].includes(txt.toLowerCase())) {
-        collector.stop("iptal");
-        try { db.delete(`otomasyon_${gid}`); } catch {}
-        await message.channel.send(t(lang, "otomasyon.kurulumIptal")).catch(() => {});
-        return;
-      }
-      if (state.asama === "soru") {
-        state.soru = txt.slice(0, 500);
-        state.asama = "cevap";
-        await message.channel.send(t(lang, "otomasyon.kurulumCevap")).catch(() => {});
-      } else if (state.asama === "cevap") {
-        const id = `oto_${Date.now().toString(36)}_${Math.random().toString(36).substr(2, 6)}`;
-        db.set(`otoegitim_${gid}_${id}`, { soru: state.soru, cevap: txt.slice(0, 2000), ekleyen: message.author.id, tarih: Date.now() });
-        try { ownerLog(client, `🧠 **Otomasyon ilk eğitim** (<@${message.author.id}>) — **${message.guild.name}** (${gid})\n❓ ${state.soru.slice(0, 300)}`).catch(() => {}); } catch {}
-        if (!state.kanal) {
-          state.asama = "kanal";
-          await message.channel.send(t(lang, "otomasyon.kurulumKanal")).catch(() => {});
-        } else if (!state.kategori) {
-          state.asama = "kategori";
-          await message.channel.send(t(lang, "otomasyon.kurulumKategori")).catch(() => {});
-        } else if (!state.modlog) {
-          state.asama = "modlog";
-          await message.channel.send(t(lang, "otomasyon.modlogSor")).catch(() => {});
-        } else {
-          collector.stop("bitti"); return kurulumBitir(client, message, lang, gid, state);
-        }
-      } else if (state.asama === "kanal") {
-        const kc = m.mentions.channels.find(c => c.isTextBased?.());
-        if (!kc) { await message.channel.send(t(lang, "otomasyon.ayarKanalYok")).catch(() => {}); return; }
-        state.kanal = kc.id;
-        if (!state.kategori) {
-          state.asama = "kategori";
-          await message.channel.send(t(lang, "otomasyon.kurulumKategori")).catch(() => {});
-        } else if (!state.modlog) {
-          state.asama = "modlog";
-          await message.channel.send(t(lang, "otomasyon.modlogSor")).catch(() => {});
-        } else {
-          collector.stop("bitti"); return kurulumBitir(client, message, lang, gid, state);
-        }
-      } else if (state.asama === "kategori") {
-        const cozum = await kategoriCoz(m, lang, gid, txt);
-        if (cozum.hata || !cozum.kategori) { await message.channel.send(t(lang, "otomasyon.kategoriIdYok")).catch(() => {}); return; }
-        state.kategori = cozum.kategori.id;
-        if (cozum.otomatik) {
-          await message.channel.send(t(lang, "ticket.kategoriOtomatik", { kategori: `${cozum.kategori}` })).catch(() => {});
-        }
-        if (!state.modlog) {
-          state.asama = "modlog";
-          await message.channel.send(t(lang, "otomasyon.modlogSor")).catch(() => {});
-        } else {
-          collector.stop("bitti"); return kurulumBitir(client, message, lang, gid, state);
-        }
-      } else if (state.asama === "modlog") {
-        if (!["atla", "skip", "geç", "gec"].includes(txt.toLowerCase())) {
-          const mk = m.mentions.channels.find(c => c.isTextBased?.());
-          if (mk) state.modlog = mk.id;
-        }
-        collector.stop("bitti"); return kurulumBitir(client, message, lang, gid, state);
-      }
-    } catch {}
-  });
-  collector.on("end", async (_c, reason) => {
-    try {
-      if (reason !== "bitti") {
-        try { db.delete(`otomasyon_${gid}`); } catch {}
-        await message.channel.send(t(lang, "otomasyon.kurulumZamanAsimi")).catch(() => {});
-      }
-    } catch {}
+  return message.reply({
+    embeds: [new EmbedBuilder().setColor("#ee7621")
+      .setTitle(t(lang, "otomasyon.baslik"))
+      .setDescription(t(lang, "otomasyon.kullanim"))]
   });
 };
 
-function kurulumBitir(client, message, lang, gid, state) {
-  db.set(`otomasyon_${gid}`, { aktif: true, kuran: message.author.id, tarih: Date.now(), noAnswerKanal: state.kanal, ticketKategori: state.kategori, modlogKanal: state.modlog || null });
-  try { ownerLog(client, `🤖 **Otomasyon kuruldu:** **${message.guild.name}** (${gid}) — kuran: <@${message.author.id}> ${message.author.tag}`).catch(() => {}); } catch {}
-  try { modlogGonder(message.guild, t(lang, "otomasyon.sssBitti")); } catch {}
-  return message.channel.send(t(lang, "otomasyon.sssBitti")).catch(() => {});
-}
-
-exports.conf = { enabled: true, guildOnly: true, aliases: ["oto", "otomasyon-ai", "auto"], permLevel: 4, kategori: "yapayzeka" };
-exports.help = { name: "otomasyon", description: "Sunucuya özel AI eğitimi (Premium).", usage: "otomasyon | aç [#kanal #kategori #modlog] | öğret soru | cevap | kanal #x | ayar | durum | kapat | veri sil" };
+exports.conf = {
+  enabled: true, guildOnly: true,
+  aliases: ["otomasyon", "automation", "automations", "otomasyon-kural"],
+  permLevel: 0, kategori: "otomasyon"
+};
+exports.help = {
+  name: "otomasyon",
+  description: "Mesaj/katılım/rol/ses tetikli otomasyon kuralları.",
+  usage: "otomasyon [yeni|tetik|koşul|eylem|aç|kapat|bilgi|sil] <id>"
+};

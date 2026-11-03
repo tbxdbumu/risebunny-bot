@@ -43,6 +43,17 @@ module.exports = async message => {
   // Normal komutlar için sunucu ve üye kontrolü
   if (!message.guild || !message.member) return;
 
+  /* ── Mesaj başına XP ────────────────────────────────────────────────
+     Prefix'ten ÖNCE: "r!" siz sohbet de XP kazandırır. Cooldown ve
+     kanal/rol filtreleri util/xp.js içinde. Hata komut akışını bozmaz. */
+  require("../util/xp").mesajXpIsle(message.member, message).catch(() => {});
+
+  /* ── Otomasyon kuralları (mesaj tetiği) ───────────────────────────────
+     Prefix'ten önce: komut mesajları da kurala uyabilir (MEE6 davranışı).
+     Kural yoksa util/automation hızlıca çıkar. */
+  require("../util/automation").calistir(client, message.guild, "mesaj", { mesaj: message, uye: message.member })
+    .catch(() => {});
+
   const prefix = process.env.PREFIX || PREFIX;
 
   if (!message.content.startsWith(prefix)) return;
