@@ -189,7 +189,13 @@ function t(lang, key, vars = {}) {
   lang = normalizeLang(lang);
   let text = get(diller[lang], key);
   if (text === undefined) text = get(diller[VARSAYILAN], key);
-  if (text === undefined) return key;
+  /* Ceviri yoksa ham anahtar GORUNMESIN: "kategoriler.rol" gibi
+     kullaniciya sizan metinler buradan geliyordu. Son parcayi
+     okunabilir hale getirip donduruyoruz. */
+  if (text === undefined) {
+    const son = String(key).split(".").pop();
+    return son.replace(/([a-z])([A-Z])/g, "$1 $2");
+  }
   if (typeof text !== "string") return text;
   return text.replace(/\{(\w+)\}/g, (_, k) => (vars[k] !== undefined ? String(vars[k]) : `{${k}}`));
 }

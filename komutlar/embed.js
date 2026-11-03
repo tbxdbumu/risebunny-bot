@@ -34,10 +34,19 @@ const BOS = { baslik: "", aciklama: "", renk: "#ee7621", resim: "", kucukresim: 
 function taslakGetir(gid) { return { ...BOS, ...(db.fetch(TASLAK(gid)) || {}) }; }
 function taslakYaz(gid, v) { db.set(TASLAK(gid), { ...BOS, ...v }); }
 
+/* Discord bir embed'de en az bir İÇERİK alanı ister (başlık/açıklama/alan).
+   Sadece renkli boş embed gönderilirse 50035 BASE_TYPE_REQUIRED döner.
+   Bu yüzden içerik yoksa açıklamayı zorunlu olarak dolduruyoruz. */
+function icerikVarMi(d) {
+  return !!(d.baslik || d.aciklama || d.alanlar?.length || d.resim || d.kucukresim);
+}
+
 function embedOlustur(d, lang) {
   const e = new EmbedBuilder().setColor(d.renk || "#ee7621");
   if (d.baslik) e.setTitle(d.baslik.slice(0, 256));
   if (d.aciklama) e.setDescription(d.aciklama.slice(0, 4000));
+  /* İçerik yoksa boş embed Discord'a gönderilemez → bilgilendirici açıklama koy */
+  if (!icerikVarMi(d)) e.setDescription(t(lang, "embed.bosOnizleme"));
   if (d.resim) e.setImage(d.resim);
   if (d.kucukresim) e.setThumbnail(d.kucukresim);
   if (d.altbilgi) e.setFooter({ text: d.altbilgi.slice(0, 2048) });

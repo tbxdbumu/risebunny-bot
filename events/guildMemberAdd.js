@@ -21,8 +21,9 @@ module.exports = async (member) => {
        Tek kaynak `otoRL_<gid>` (komutlar/otorol-ayarla.js yazar).
        Eski anahtar `otorol_<gid>`'i de destekle (geriye uyum). */
     const otoRolId = db.fetch(`otoRL_${guild.id}`) || db.fetch(`otorol_${guild.id}`);
+    let rol = null;
     if (otoRolId) {
-      const rol = guild.roles.cache.get(otoRolId);
+      rol = guild.roles.cache.get(otoRolId);
       if (rol && !member.roles.cache.has(rol.id)) {
         const izin = guild.members.me?.permissions?.has("ManageRoles");
         if (izin && rol.position < guild.members.me.roles.highest.position) {
@@ -46,10 +47,12 @@ module.exports = async (member) => {
     if (logKanalId && otoRolId) {
       const kanal = guild.channels.cache.get(logKanalId);
       if (kanal) {
+        /* DİKKAT: rol MENTION edilmez. `<@&id>` yazılırsa o role sahip
+           herkes ping yer ve sunucuya "herkes etiketlendi" gibi görünür.
+           Sadece rolün ADINI düz metin olarak yazıyoruz. */
         await kanal.send(t(lang, "otorol.yeniUye", {
           kullanici: `<@${user.id}>`,
-          rol: `<@&${otoRolId}>`
-        })).catch(() => {});
+          rol: rol && rol.name ? rol.name : "—"        }), { allowedMentions: { parse: [] } }).catch(() => {});
       }
     }
 

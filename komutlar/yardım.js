@@ -20,7 +20,11 @@ function kategoriListesi(client, lang, katId) {
       eklenen.add(canonical);
       const b = komutBilgi(lang, canonical);
       const kapali = cmd && cmd.conf && cmd.conf.enabled === false ? (EN ? " (disabled)" : " (kapalı)") : "";
-      satirlar.push(`\`${PREFIX}${komutAdi(lang, canonical)}\`${kapali} — ${b.aciklama || "-"}`);
+      const kisa = String(b.kullanim || "").split(" | ")[0].trim();
+      satirlar.push(
+        `**\`${PREFIX}${komutAdi(lang, canonical)}\`**${kapali} — ${b.aciklama || "-"}` +
+        (kisa ? `\n> \`${PREFIX}${kisa}\`` : "")
+      );
     };
     /* 1) Sahip-only komutlar (komut dosyasındaki permLevel: 5) */
     for (const [canonical, cmd] of client.commands) {
@@ -42,9 +46,73 @@ function kategoriListesi(client, lang, katId) {
     if (!cmd) continue;
     const ad = komutAdi(lang, canonical);
     const b = komutBilgi(lang, canonical);
-    satirlar.push(`\`${PREFIX}${ad}\` — ${b.aciklama || "-"}`);
+    const kisa = String(b.kullanim || "").split(" | ")[0].trim();
+    satirlar.push(
+      `**\`${PREFIX}${ad}\`** — ${b.aciklama || "-"}` +
+      (kisa ? `\n> \`${PREFIX}${kisa}\`` : "")
+    );
   }
   return satirlar;
+}
+
+/**
+ * Tek komut icin detayli yardim karti.
+ * r!yardim <komut>  →  aciklama + kullanim + ornek + takma adlar
+ */
+function komutDetay(client, lang, katId, canonical) {
+  const EN = lang === "en";
+  const cmd = client.commands.get(canonical);
+  const b = komutBilgi(lang, canonical);
+  const ad = komutAdi(lang, canonical);
+  const aliases = (cmd?.conf?.aliases || []).filter((a) => a !== canonical);
+
+  const embed = new EmbedBuilder().setColor("Random");
+  const ikon = client.user?.displayAvatarURL?.() || "";
+  embed.setAuthor({
+    name: `${PREFIX}${ad}`,
+    ...(/^https?:\/\//.test(ikon) ? { iconURL: ikon } : {}),
+  });
+  embed.setDescription(b.aciklama || "-");
+
+  if (b.kullanim) {
+    embed.addFields({
+      name: EN ? "📋 Usage" : "📋 Kullanım",
+      value: String(b.kullanim)
+        .split(" | ")
+        /* Alt komut da ayni komutla baslamali. `embed alan ekle <ad> | <değer>`
+           gibi arguman icindeki boru isareti yeni komut sanilmasin. */
+        .reduce((out, parca) => {
+          const s = parca.trim();
+          if (!s) return out;
+          const onceki = out[out.length - 1];
+          if (onceki && !s.startsWith(ad)) out[out.length - 1] = `${onceki.slice(0, -1)} | ${s}\``;
+          else out.push(`\`${PREFIX}${s}\``);
+          return out;
+        }, [])
+        .join("\n")
+        .slice(0, 1024),
+    });
+  }
+  if (aliases.length) {
+    embed.addFields({
+      name: EN ? "🔗 Aliases" : "🔗 Takma adlar",
+      value: aliases.slice(0, 12).map((a) => `\`${PREFIX}${a}\``).join(", ").slice(0, 1024),
+    });
+  }
+  const kat = KATEGORILER.find((k) => k.id === katId);
+  if (kat) {
+    embed.addFields({ name: EN ? "📁 Category" : "📁 Kategori", value: `${kat.emoji} ${katAdi(lang, kat.id)}`, inline: true });
+  }
+  if (cmd?.conf?.permLevel >= 1) {
+    const seviye = [EN ? "Everyone" : "Herkes", EN ? "Moderator" : "Moderatör", EN ? "Admin" : "Yönetici",
+      EN ? "Server Owner" : "Sunucu Sahibi", EN ? "Bot Owner" : "Bot Sahibi"][Math.min(cmd.conf.permLevel, 4)];
+    embed.addFields({ name: EN ? "🔑 Permission" : "🔑 Gerekli yetki", value: seviye, inline: true });
+  }
+  const footer = EN
+    ? `Type \`${PREFIX}help <category>\` to list a category`
+    : `Kategori listesi için \`${PREFIX}yardım <kategori>\` yaz`;
+  embed.setFooter({ text: footer });
+  return embed;
 }
 
 /** AI komutlarını öne çıkararak listeler */
@@ -73,9 +141,10 @@ function aiKomutListesi(lang) {
 
 exports.run = async (client, message, args) => {
   const lang = await getLang(message.author.id);
-  const uyelik = isPremium(message.author.id) ? "💎 Premium" : "Normal";
-  const davet = `https://discord.com/api/oauth2/authorize?client_id=${client.user.id}&permissions=8&scope=bot%20applications.commands`;
   const EN = lang === "en";
+  const premiumMu = isPremium(message.author.id);
+  const uyelik = premiumMu ? "💎 Premium" : (EN ? "Standard" : "Standart");
+  const davet = `https://discord.com/api/oauth2/authorize?client_id=${client.user.id}&permissions=8&scope=bot%20applications.commands`;
 
   // r!yardım <kategori> (TR veya EN kategori adıyla)
   const alt = (args[0] || "").toLowerCase();
@@ -100,48 +169,65 @@ exports.run = async (client, message, args) => {
     if (eski && (eski.conf.kategori === "Bot" || eski.conf.kategori === "bot" || eski.conf.kategori === "yardım")) {
       return eski.run(client, message, args.slice(1));
     }
+    /* r!yardım <komut> — tek komut icin detayli kart */
+    if (eski) {
+      const canonical = eski.help?.name || alt;
+      const kayit = KOMUTLAR[canonical] || Object.entries(KOMUTLAR).find(([, v]) => v.en === canonical)?.[1];
+      const detay = komutDetay(client, lang, kayit?.kat || "kullanici", canonical);
+      return message.channel.send({ embeds: [detay] }).catch(() => {});
+    }
   }
 
   const menuKategoriler = KATEGORILER.filter(k => !GIZLI.has(k.id) && (k.id !== "sahip" || message.author.id === SAHIP_ID));
+
+  /* Kategori bolumleri: kategori ADLARI komut degildir, o yuzden
+     `r!ad` gibi uydurma komut yazmiyoruz. Sadece dil-bagimsiz kimlik
+     gosterilir ve secim menusu kullanilir. */
+  const kategoriSatirlari = menuKategoriler
+    .map(k => `${k.emoji} **${katAdi(lang, k.id)}**`)
+    .join(" • ");
+
   const embed = new EmbedBuilder()
     .setAuthor({ name: t(lang, "yardim.baslik"), iconURL: client.user.displayAvatarURL() })
     .setColor("Random")
     .setThumbnail(message.author.displayAvatarURL())
-    .setDescription(t(lang, "yardim.aciklama", { kullanici: `${message.author}`, prefix: PREFIX, uyelik }))
+    .setDescription(
+      t(lang, "yardim.aciklama", { kullanici: `<@${message.author.id}>`, prefix: PREFIX, uyelik }) +
+      (EN
+        ? `\n\n**How to use**\n\`${PREFIX}help <category>\` — list commands in a category\n\`${PREFIX}help <command>\` — detailed help for one command`
+        : `\n\n**Nasıl kullanılır**\n\`${PREFIX}yardım <kategori>\` — kategorideki komutları listeler\n\`${PREFIX}yardım <komut>\` — tek komut için detaylı yardım`)
+    )
     .addFields({
-      name: `🤖 ${EN ? "AI FEATURES — NEW!" : "AI ÖZELLİKLERİ — YENİ!"}`,
-      value: aiKomutListesi(lang)
+      name: `📁 ${t(lang, "yardim.kategoriler")}`,
+      value: kategoriSatirlari.slice(0, 1024)
     })
     .addFields({
-      name: `🚀 ${EN ? "V2.0 UPDATE — NOW LIVE!" : "V2.0 GÜNCELLEMESİ YAYINDA!"}`,
-      value: EN
-        ? "**• 🎁 Launch coupon `RISE-V2` — 250,000 cash** (one per account, redeem on our website after signing in with Discord)\n**• 🐾 Pet system 2.0** — button menus, fair ±10% sales\n**• 🛒 Website shop** — discounted premium & pets\n**• 🔑 Discord login** on site & forum\n**• 💾 Backup system** — `r!yedek` / `r!yedek-yükle`\n**• 👑 Owner panel** — `r!bakım`, `r!mağaza-yönet`, `r!kupon`"
-        : "**• 🎁 Yayın kuponu `RISE-V2` — 250.000 RiseBunny Cash** (hesap başına tek, sitemizde Discord ile giriş yaptıktan sonra girilir)\n**• 🐾 Pet sistemi 2.0** — butonlu menüler, adil ±%10 satış\n**• 🛒 Site mağazası** — indirimli premium & pet\n**• 🔑 Discord ile giriş** — site + forum\n**• 💾 Yedek sistemi** — `r!yedek` / `r!yedek-yükle`\n**• 👑 Sahip paneli** — `r!bakım`, `r!mağaza-yönet`, `r!kupon`"
+      name: `💎 ${t(lang, "yardim.premiumBaslik")}`,
+      value: t(lang, "yardim.premiumPerks")
     })
-    .addFields({
-      name: `• ${t(lang, "yardim.kategoriler")}`,
-      value: menuKategoriler.map(k => `${k.emoji} • \`${PREFIX}${katAdi(lang, k.id)}\` — ${t(lang, `kategoriler.${k.id}`)}`).join("\n").slice(0, 1020)
-    })
-    .addFields({ name: `💎 ${t(lang, "yardim.premiumBaslik")}`, value: t(lang, "yardim.premiumPerks") })
-    .setImage("https://media.discordapp.net/attachments/1126239630203818095/1130479789757693952/standard.gif")
-    .setFooter({ text: "RiseBunny V2.0", iconURL: message.author.displayAvatarURL() })
+    .setFooter({ text: "RiseBunny", iconURL: message.author.displayAvatarURL() })
     .setTimestamp();
 
   const menu = new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
       .setCustomId("yardim_kategori")
       .setPlaceholder(EN ? "Select category..." : "Kategori seç...")
-      .addOptions(menuKategoriler.map(k => ({ label: katAdi(lang, k.id).slice(0, 90), description: t(lang, `kategoriler.${k.id}`).slice(0, 90), value: k.id, emoji: k.emoji })))
+      .addOptions(menuKategoriler.slice(0, 25).map(k => ({
+        label: katAdi(lang, k.id).slice(0, 90),
+        description: t(lang, `kategoriler.${k.id}`).slice(0, 90),
+        value: k.id,
+        emoji: k.emoji
+      })))
   );
   const butonlar = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setLabel("WebSite").setStyle(ButtonStyle.Link).setURL("https://risebunny.vercel.app").setEmoji("🌐"),
     new ButtonBuilder().setLabel(t(lang, "yardim.davetEt")).setStyle(ButtonStyle.Link).setURL(davet).setEmoji("📨"),
-    new ButtonBuilder().setLabel(t(lang, "yardim.destekSunucu")).setStyle(ButtonStyle.Link).setURL(DESTEK).setEmoji("💬"),
-    new ButtonBuilder().setLabel(EN ? "V2.0 Coupon" : "V2.0 Kuponu").setStyle(ButtonStyle.Success).setCustomId("kupon_bilgi_v2")
+    new ButtonBuilder().setLabel(t(lang, "yardim.destekSunucu")).setStyle(ButtonStyle.Link).setURL(DESTEK).setEmoji("💬")
   );
   await message.channel.send({ embeds: [embed], components: [menu, butonlar] });
 };
 
 exports.kategoriListesi = kategoriListesi;
+exports.komutDetay = komutDetay;
 exports.conf = { enabled: true, guildOnly: false, aliases: ["y", "help", "h", "yardim"], permLevel: 0, kategori: "bot" };
 exports.help = { name: "yardım", description: "Yardım menüsünü gösterir.", usage: "yardım [kategori]" };

@@ -5,7 +5,18 @@ const { AttachmentBuilder } = require('discord.js');
 async function _avatar(ctx, avatarURL, x, y, r) {
   if (!avatarURL) return;
   try {
-    const avatar = await loadImage(avatarURL).catch(() => null);
+    /* Avatar indirmesi aga bagli; yavas/olu CDN karti kilitlemesin ve
+       gec kalan istek disarida yakalanmamis hata birakmasin.
+       Indirmeyi fetch ile yapip loadImage'e Buffer veriyoruz; loadImage'in
+       kendi ag yolu (TLS) bazi aglarda yakalanamayan hata firlatiyor. */
+    const indir = async () => {
+      const r = await fetch(avatarURL, { signal: AbortSignal.timeout(4000) });
+      if (!r.ok) return null;
+      const buf = Buffer.from(await r.arrayBuffer());
+      return await loadImage(buf).then((i) => i, () => null);
+    };
+    const zamanAsimi = new Promise((r) => setTimeout(() => r(null), 4000));
+    const avatar = await Promise.race([indir().then((i) => i, () => null), zamanAsimi]);
     if (!avatar) return;
     ctx.save();
     ctx.beginPath();

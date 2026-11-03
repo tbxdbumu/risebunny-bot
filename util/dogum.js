@@ -17,6 +17,19 @@ const { getLangSync, t } = require("../dil");
 const anahtar = (d = new Date()) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
+/* Tarihi secilen dilde yazar: "12 Temmuz" / "12 July" (+ yil varsa). */
+const AYLAR_TR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+  "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+const AYLAR_EN = ["January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"];
+
+function tarihYaz(k, lang) {
+  if (!k) return "—";
+  const aylar = lang === "en" ? AYLAR_EN : AYLAR_TR;
+  const ayAdi = aylar[(k.ay || 1) - 1] || "—";
+  return k.yil ? `${k.gun} ${ayAdi} ${k.yil}` : `${k.gun} ${ayAdi}`;
+}
+
 /** "12 temmuz" / "12 7" / "12/07" / "1995-07-12" → { gun, ay, yil } */
 function tarihCoz(metin) {
   if (!metin) return null;
@@ -37,15 +50,30 @@ function tarihCoz(metin) {
   }
 
   // 12 temmuz 1995 | 12 temmuz
-  const aylar = ["ocak", "şubat", "subat", "mart", "nisan", "mayıs", "mayis", "haziran",
-    "temmuz", "ağustos", "agustos", "eylül", "eylul", "ekim", "kasım", "kasim", "aralık", "aralik"];
+  /* Ay adı → numara eşlemesi. ÖNEMLİ: bu bir LİSTE DEĞİL, eşleme olmalı.
+     Liste kullanıldığında aynı ayın yazımları (şubat/subat, mayıs/mayis,
+     ağustos/agustos, eylül/eylul, kasım/kasim, aralık/aralik) indeksleri
+     kaydırıyor ve "12 temmuz" Eylül olarak kaydediliyordu. */
+  const AY_ESLEME = {
+    ocak: 1,
+    "şubat": 2, subat: 2,
+    mart: 3,
+    nisan: 4,
+    "mayıs": 5, mayis: 5,
+    haziran: 6,
+    temmuz: 7,
+    "ağustos": 8, agustos: 8,
+    "eylül": 9, eylul: 9,
+    ekim: 10,
+    "kasım": 11, kasim: 11,
+    "aralık": 12, aralik: 12,
+  };
   const parcalar = s.split(/\s+/);
   const gun = parseInt(parcalar[0], 10);
-  const ayAdi = parcalar[1];
+  const ayAdi = (parcalar[1] || "").replace(/[.,]/g, "");
   if (!gun || !ayAdi) return null;
-  const ayIdx = aylar.indexOf(ayAdi.replace(/[.,]/g, ""));
-  if (ayIdx === -1) return null;
-  const ay = ayIdx + 1;
+  const ay = AY_ESLEME[ayAdi];
+  if (!ay) return null;
   const yil = parcalar[2] ? parseInt(parcalar[2], 10) : undefined;
   if (!gecerliMi(gun, ay)) return null;
   return { gun, ay, ...(yil ? { yil } : {}) };
@@ -89,12 +117,20 @@ async function kontrolet(client) {
     const sablon = db.fetch(`dogumgünü_mesaj.${gid}`) || t(lang, "dogum.mesaj");
 
     for (const k of yeni) {
-      const metin = String(sablon).replace(/\{kullanici\}/g, `<@${k.uid}>`).replace(/\{sunucu\}/g, guild.name);
+      /* Metinde tarih de yazilsin: {tarih} / {tarihEn} desteklenir. */
+      const metin = String(sablon)
+        .replace(/\{kullanici\}/g, `<@${k.uid}>`)
+        .replace(/\{sunucu\}/g, guild.name)
+        .replace(/\{tarih\}/g, tarihYaz(k, lang))
+        .replace(/\{tarihEn\}/g, tarihYaz(k, "en"));
       await kanal.send({
+        content: `<@${k.uid}>`,
+        allowedMentions: { users: [k.uid] },
         embeds: [new EmbedBuilder()
           .setColor("#ff2d95")
           .setTitle(t(lang, "dogum.baslik"))
           .setDescription(metin)
+          .setFooter({ text: tarihYaz(k, lang) })
           .setThumbnail(guild.members.cache.get(k.uid)?.user.displayAvatarURL({ size: 256 }) || null)]
       }).catch(() => {});
     }
@@ -108,4 +144,4 @@ function startDogumSweeper(client) {
   setInterval(() => kontrolet(client).catch(() => {}), 10 * 60 * 1000); // 10 dk'da bir
 }
 
-module.exports = { tarihCoz, gunuGeldi, kontrolet, startDogumSweeper };
+module.exports = { tarihCoz, tarihYaz, gunuGeldi, kontrolet, startDogumSweeper };

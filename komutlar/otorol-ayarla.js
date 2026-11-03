@@ -48,10 +48,14 @@ exports.run = async (client, message, args) => {
   if (kanal) db.set(`otoRK_${gid}`, kanal.id);
   else db.delete(`otoRK_${gid}`);
 
-  await message.reply(t(lang, "otorol.ayarlandi", {
-    rol: `<@&${rol.id}>`,
-    kanal: kanal ? `<#${kanal.id}>` : "—"
-  }));
+  /* Rol mention edilmez — düz ad yazılır (ping atmasın). */
+  await message.reply({
+    content: t(lang, "otorol.ayarlandi", {
+      rol: rol.name,
+      kanal: kanal ? `<#${kanal.id}>` : "—"
+    }),
+    allowedMentions: { parse: [] }
+  });
 
   // Mevcut üyelere uygula (isteğe bağlı ama GUI'de sık istenen)
   if (args.includes("--mevcut") || args.includes("--all")) {
@@ -61,7 +65,10 @@ exports.run = async (client, message, args) => {
       try { await m.roles.add(rol.id, "Otorol: mevcut üyeler"); ok++; } catch {}
       if (ok % 40 === 0) await new Promise(r => setTimeout(r, 100));
     }
-    message.channel.send(t(lang, "otorol.hepsiVerildi", { adet: ok, rol: `<@&${rol.id}>` })).catch(() => {});
+    message.channel.send({
+      content: t(lang, "otorol.hepsiVerildi", { adet: ok, rol: rol.name }),
+      allowedMentions: { parse: [] }
+    }).catch(() => {});
   }
 };
 

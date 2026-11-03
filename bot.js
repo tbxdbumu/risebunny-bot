@@ -46,6 +46,7 @@ try {
 
 const Discord = require("discord.js");
 const { t, getLangSync, getGuildLang } = require("./dil");
+const DIL = require("./dil");
 const U = require("./utils");
 
 let AI = null;
@@ -2612,6 +2613,14 @@ for (const file of fs.readdirSync("./komutlar/").filter(f => f.endsWith(".js") &
     console.log(`Yüklenen komut: ${command.help.name}.`);
     client.commands.set(command.help.name.toLowerCase(), command);
     for (const a of command.conf?.aliases || []) client.aliases.set(String(a).toLowerCase(), command.help.name.toLowerCase());
+    /* Ingilizce adlari da gercek takma ad olarak kaydet. Yardim menusu `r!banka`
+       yerine `r!bank` yazdigi icin bu adin gercekten calismasi gerekir. */
+    const enBilgi = DIL.KOMUTLAR[command.help.name];
+    for (const enAd of [enBilgi?.en, ...(enBilgi?.enAlias || [])].filter(Boolean)) {
+      const k = String(enAd).toLowerCase();
+      if (k === command.help.name.toLowerCase()) continue;
+      if (!client.aliases.has(k)) client.aliases.set(k, command.help.name.toLowerCase());
+    }
   } catch (e) {
     yuklenemeyen.push(file);
     console.error(`Komut yüklenemedi (${file}): ${e.message}`);
