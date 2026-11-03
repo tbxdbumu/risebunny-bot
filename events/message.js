@@ -35,13 +35,26 @@ module.exports = async message => {
   const client = message.client;
   if (!client || message.author?.bot) return;
 
+  /* ── Mesaj teşhisi (varsayılan AÇIK) ──────────────────────────────────
+     "Bot cevap vermiyor" arızasında log'da mesaja dair tek satır yoktu.
+     Bu blok, mesajın hangi aşamada elendiğini tek satırda gösterir.
+     Kapatmak için Render'da RB_DEBUG=0 tanımla. */
+  const IZ = process.env.RB_DEBUG !== "0";
+  const iz = IZ ? (...a) => console.log("[MSG]", ...a) : () => {};
+  if (IZ) {
+    iz(`geldi guild=${message.guild?.id || "DM"} ch=${message.channel?.id} user=${message.author?.tag} icerik=${JSON.stringify(String(message.content || "").slice(0, 60))}`);
+  }
+
   // 🤖 AI SOHBET SİSTEMİ (prefix gerektirmez, DM'de de çalışır)
   // "rise <soru>" formatında tetiklenir
   const aiCevapVerdi = await aiIsle(message, client);
-  if (aiCevapVerdi) return;
+  if (aiCevapVerdi) { iz("AI cevap verdi, komutlar atlandi"); return; }
 
   // Normal komutlar için sunucu ve üye kontrolü
-  if (!message.guild || !message.member) return;
+  if (!message.guild || !message.member) {
+    iz(`elenen: guild=${!!message.guild} member=${!!message.member} — Sunucu Üyeleri intenti kapalı olabilir`);
+    return;
+  }
 
   /* ── Mesaj başına XP ────────────────────────────────────────────────
      Prefix'ten ÖNCE: "r!" siz sohbet de XP kazandırır. Cooldown ve
@@ -55,6 +68,12 @@ module.exports = async message => {
     .catch(() => {});
 
   const prefix = process.env.PREFIX || PREFIX;
+
+  if (IZ) {
+    let json = null;
+    try { json = require("../ayarlar.json").prefix; } catch {}
+    iz(`prefix kullanilan=${JSON.stringify(prefix)} ayarlar.json=${JSON.stringify(json)} env=${JSON.stringify(process.env.PREFIX || null)} eslesme=${message.content.startsWith(prefix)}`);
+  }
 
   if (!message.content.startsWith(prefix)) return;
 
@@ -118,7 +137,10 @@ module.exports = async message => {
     return message.reply({ content: notFoundMsg, allowedMentions: { repliedUser: false } }).catch(() => {});
   }
   const cmd = client.commands.get(canonical);
-  if (!cmd) return;
+  if (!cmd) {
+    iz(`elenen: komut cozuldu (${canonical}) ama client.commands'te yok — komut dosyasi yuklenmemis`);
+    return;
+  }
 
   // Dil secmemis kullanici veya sunucu dili secmemis sunucu sahibi (dil komutu haric)
   // SAHİP BYPASS: bot sahibi bakım/mağaza gibi acil komutları dil seçmeden çalıştırır
@@ -129,6 +151,7 @@ module.exports = async message => {
 
   // 1. ÖNCE DİL SEÇİMİ - dil seçilmemişse dil paneli göster (onay butonları YOK)
   if (canonical !== "dil" && !sahipBypass && (userNeedsLang || guildNeedsLang)) {
+    iz(`dil paneli gonderildi (dilSecili=${hasLang(message.author.id)} sunucuDili=${hasGuildLang(message.guild.id)})`);
     try {
       const { dilPaneli } = require("../komutlar/dil");
       return await message.reply(dilPaneli(prefix, { isOwner, userNeedsLang, guildNeedsLang })).catch(() => {});
@@ -140,6 +163,7 @@ module.exports = async message => {
   // 2. SONRA ONAY - dil seçilmişse ama onay verilmemişse onay paneli göster (dil seçili, onay butonları VAR)
   if (canonical !== "dil" && canonical !== "yardım" && !sahipBypass) {
     if (!hasConsent(message.author.id)) {
+      iz("onay paneli gonderildi — kullanici veri isleme onayini vermemis");
       const ulang = await getLang(message.author.id);
       try {
         const { dilPaneli } = require("../komutlar/dil");
@@ -210,7 +234,9 @@ module.exports = async message => {
   if (!modMuaf && perms < cmd.conf.permLevel) return yetkiHata(t(lang, "ortak.yetki", { yetki: "Daha yüksek yetki" }));
 
   try {
+    iz(`calistiriliyor: ${canonical} (permLevel=${cmd.conf.permLevel}, kullanici=${perms})`);
     await cmd.run(client, message, params, perms);
+    iz(`calisti: ${canonical}`);
     // Komut başarıyla çalıştıysa XP ver
     if (cmd.conf.enabled !== false) {
       try { await giveCommandXp(client, message.author.id, message.guild.id); } catch {}

@@ -25,6 +25,7 @@
  */
 const { EmbedBuilder, PermissionFlagsBits } = require("discord.js");
 const { getLangSync, t } = require("../dil");
+const { isPremium } = require("../utils");
 const oto = require("../util/automation");
 
 const TETIK_ESLE = {
@@ -47,6 +48,7 @@ const EYLEM_ESLE = {
 
 exports.run = async (client, message, args) => {
   const lang = getLangSync(message.author.id);
+  if (!isPremium(message.author.id)) return message.reply(t(lang, "ortak.premiumGerek"));
   const gid = message.guild.id;
   if (!message.member.permissions.has(PermissionFlagsBits.ManageGuild))
     return message.reply(t(lang, "otomasyon.yetki"));

@@ -2509,6 +2509,26 @@ async function postStats(reason) {
 }
 client.once("clientReady", () => {
   console.log(`[Bot] ${client.user.tag} hazır.`);
+
+  /* ── Başlangıç teşhisi: "bot cevap vermiyor" vakalarının kökü ────────
+     Discord Developer Portal'da Message Content Intent kapalıysa bot
+     MESAJI görür ama ICERIGINI bos gorur; "r!yardım" komutu hic yakalanmaz
+     ve log'a tek satir düşmez. Bunu ancak CANLI mesajla anlarız, o yüzden
+     [MSG] izi her zaman açık (RB_DEBUG=0 ile kapatılır). */
+  try {
+    const adet = client.guilds.cache.size;
+    let gorunmez = 0;
+    for (const [, g] of client.guilds.cache) {
+      if (!g.members.me) gorunmez++;
+    }
+    console.log(`[Teşhis] ${adet} sunucu, ${gorunmez} sunucuda üye listesi yok (Sunucu Üyeleri intent?).`);
+    console.log(`[Teşhis] Prefix: ${JSON.stringify(process.env.PREFIX || "r!")} · mesaj izi: ${process.env.RB_DEBUG === "0" ? "KAPALI" : "AÇIK"}`);
+    console.log("[Teşhis] Prefix komutları için Discord Developer Portal → Bot → Message Content Intent AÇIK olmalı.");
+    if (gorunmez > 0) {
+      console.log("[Teşhis] !! Üye listesi eksik: Developer Portal → Bot → Server Members Intent kapalı olabilir.");
+    }
+  } catch {}
+
   postStats("ready");
   setInterval(() => postStats("30dk"), 30 * 60 * 1000);
   if (!process.env.FIREBASE_BOT_EMAIL || !process.env.FIREBASE_BOT_SIFRE) {

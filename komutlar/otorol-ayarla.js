@@ -12,9 +12,11 @@
 const Discord = require("discord.js");
 const db = require("croxydb");
 const { getLangSync, t } = require("../dil");
+const { isPremium } = require("../utils");
 
 exports.run = async (client, message, args) => {
   const lang = getLangSync(message.author.id);
+  if (!isPremium(message.author.id)) return message.reply(t(lang, "ortak.premiumGerek"));
   const gid = message.guild.id;
 
   if (!message.member.permissions.has(Discord.PermissionFlagsBits.Administrator))

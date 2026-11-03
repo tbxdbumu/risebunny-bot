@@ -12,7 +12,7 @@ module.exports = {
     yetki: "Bu komutu kullanabilmek icin **{yetki}** yetkisine sahip olmalisin!",
     sahipSadece: "Bu komutu sadece bot sahibi kullanabilir!",
     yoneticiGerek: "Bu komut icin **Yonetici** izni gerekir.",
-    premiumGerek: "Bu komut premium uyelere ozeldir. Satin almak icin `r!premium` yaz veya destek sunucumuza gel: https://dsc.gg/risebunny",
+    premiumGerek: "Bu komut premium üyelere özeldir. Satın almak için `r!premium` yaz veya destek sunucumuza gel: https://dsc.gg/risebunny",
     bakimda: "Bot su anda bakimda: **{sebep}**",
     dilSec: "Lutfen gecerli bir dil belirtin: `tr` veya `en`",
     dilOk: "Diliniz basariyla **Turkce** olarak ayarlandi!",

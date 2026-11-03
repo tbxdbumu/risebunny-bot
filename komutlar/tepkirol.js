@@ -21,6 +21,7 @@ const {
 } = require("discord.js");
 const db = require("croxydb");
 const { getLangSync, t } = require("../dil");
+const { isPremium } = require("../utils");
 const rolMod = require("../util/rol");
 
 const TASLAK = (gid) => `tepkirol_taslak.${gid}`;
@@ -81,6 +82,7 @@ function ayarPaneli(gid, taslak, lang) {
 
 exports.run = async (client, message, args) => {
   const lang = getLangSync(message.author.id);
+  if (!isPremium(message.author.id)) return message.reply(t(lang, "ortak.premiumGerek"));
   if (!message.member.permissions.has(PermissionFlagsBits.ManageRoles))
     return message.reply(t(lang, "tepkirol.yetki"));
   if (!message.guild.members.me.permissions.has(PermissionFlagsBits.ManageRoles))
