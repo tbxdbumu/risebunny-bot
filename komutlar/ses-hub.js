@@ -13,10 +13,12 @@
  */
 const { EmbedBuilder, PermissionFlagsBits, ChannelType } = require("discord.js");
 const { getLangSync, t } = require("../dil");
+const { isPremium } = require("../utils");
 const ses = require("../util/ses");
 
 exports.run = async (client, message, args) => {
   const lang = getLangSync(message.author.id);
+  if (!isPremium(message.author.id)) return message.reply(t(lang, "ortak.premiumGerek"));
   const gid = message.guild.id;
   const alt = (args[0] || "").toLowerCase();
 

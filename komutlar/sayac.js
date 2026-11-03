@@ -13,6 +13,7 @@
 const { EmbedBuilder, PermissionFlagsBits, ChannelType } = require("discord.js");
 const db = require("croxydb");
 const { getLangSync, t } = require("../dil");
+const { isPremium } = require("../utils");
 const sayac = require("../util/sayac");
 
 const TURLER = ["uyeler", "cevrimici", "bot", "insan", "kayitli"];
@@ -41,6 +42,7 @@ function eskiSayac(client, message, lang) {
 
 exports.run = async (client, message, args) => {
   const lang = getLangSync(message.author.id);
+  if (!isPremium(message.author.id)) return message.reply(t(lang, "ortak.premiumGerek"));
   const gid = message.guild.id;
   const alt = (args[0] || "").toLowerCase();
 

@@ -61,6 +61,32 @@ const path = require("path");
  * (yanıtlanmadı), o yüzden ilk çıktıyı `reply` ile, sonrakileri
  * `followUp` ile gönderiyoruz.
  */
+/**
+ * Boş bir Discord `Collection` taklidi.
+ *
+ * Komutlar `message.mentions.members.first()` gibi çağrılar yapıyor; düz
+ * `new Map()` bunları karşılamaz ve slash yolu "Komut çalıştırılırken hata
+ * oluştu" ile biter. Harita gibi davranır, üstüne sonuç yokken de güvenli
+ * dönen Collection metodlarını ekler.
+ */
+function coll() {
+  const m = new Map();
+  m.first = () => null;
+  m.last = () => null;
+  m.random = () => null;
+  m.at = () => null;
+  m.array = () => [];
+  m.map = () => [];
+  m.filter = () => coll();
+  m.find = () => null;
+  m.findIndex = () => -1;
+  m.some = () => false;
+  m.every = () => true;
+  m.reduce = (_fn, bas = undefined) => bas;
+  m.forEach = () => {};
+  return m;
+}
+
 function mesajTaklidi(interaction, args) {
   const sahte = {
     client: interaction.client,
@@ -81,11 +107,11 @@ function mesajTaklidi(interaction, args) {
     partial: false,
     type: 0,
     url: `https://discord.com/channels/${interaction.guildId}/${interaction.channelId}/${interaction.id}`,
-    mentions: { members: new Map(), users: new Map(), roles: new Map(), channels: new Map(), everyone: false },
-    attachments: new Map(),
+    mentions: { members: coll(), users: coll(), roles: coll(), channels: coll(), everyone: false },
+    attachments: coll(),
     embeds: [],
     components: [],
-    stickers: new Map(),
+    stickers: coll(),
     flags: { bitfield: 0, has: () => false },
   };
 

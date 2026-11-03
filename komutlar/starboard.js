@@ -11,6 +11,7 @@
  */
 const { EmbedBuilder, PermissionFlagsBits, ChannelType } = require("discord.js");
 const { getLangSync, t } = require("../dil");
+const { isPremium } = require("../utils");
 const sb = require("../util/starboard");
 
 function emojiAl(args) {
@@ -23,6 +24,7 @@ function emojiAl(args) {
 
 exports.run = async (client, message, args) => {
   const lang = getLangSync(message.author.id);
+  if (!isPremium(message.author.id)) return message.reply(t(lang, "ortak.premiumGerek"));
   const gid = message.guild.id;
   const sub = (args[0] || "").toLowerCase();
 
