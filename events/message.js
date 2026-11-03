@@ -68,6 +68,12 @@ module.exports = async message => {
     .catch(() => {});
 
   const prefix = process.env.PREFIX || PREFIX;
+  const yanitla = (payload) =>
+    message.reply(payload).catch(err => {
+      // Sessiz yutma yok: Discord cevabı reddettiyse (izin, eksik mesaj vb.)
+      // kullanıcıya hiçbir şey gitmez ve log'da tek satır görünmezdi.
+      console.error(`[MSG] cevap gonderilemedi (${err?.code || err?.name || "?"}): ${err?.message || err}`);
+    });
 
   if (IZ) {
     let json = null;
@@ -128,13 +134,13 @@ module.exports = async message => {
       const suggestionMsg = lang === "en"
         ? `❌ Can't find \`r!${fullTyped}\`. Did you mean \`r!${displayName}\`?`
         : `❌ \`r!${fullTyped}\` diye bir komut yok. \`r!${displayName}\` mu demek istediniz?`;
-      return message.reply({ content: suggestionMsg, allowedMentions: { repliedUser: false } }).catch(() => {});
+      return yanitla({ content: suggestionMsg, allowedMentions: { repliedUser: false } });
     }
     // Hic benzer komut yoksa sessiz kalma — bulunamayan komutu dille bildir
     const notFoundMsg = lang === "en"
       ? `❌ Can't find \`r!${fullTyped}\`. Type \`${prefix}help\` for the command list.`
       : `❌ \`r!${fullTyped}\` diye bir komut yok. Komutlar için \`${prefix}yardım\` yaz.`;
-    return message.reply({ content: notFoundMsg, allowedMentions: { repliedUser: false } }).catch(() => {});
+    return yanitla({ content: notFoundMsg, allowedMentions: { repliedUser: false } });
   }
   const cmd = client.commands.get(canonical);
   if (!cmd) {
@@ -154,9 +160,10 @@ module.exports = async message => {
     iz(`dil paneli gonderildi (dilSecili=${hasLang(message.author.id)} sunucuDili=${hasGuildLang(message.guild.id)})`);
     try {
       const { dilPaneli } = require("../komutlar/dil");
-      return await message.reply(dilPaneli(prefix, { isOwner, userNeedsLang, guildNeedsLang })).catch(() => {});
-    } catch {
-      return message.reply(`🌍 Önce dilini seç / Select your language: \`${prefix}dil tr\` / \`${prefix}dil en\``).catch(() => {});
+      return await yanitla(dilPaneli(prefix, { isOwner, userNeedsLang, guildNeedsLang }));
+    } catch (e) {
+      console.error(`[MSG] dil paneli olusturulamadi: ${e?.message || e}`);
+      return yanitla(`🌍 Önce dilini seç / Select your language: \`${prefix}dil tr\` / \`${prefix}dil en\``);
     }
   }
 
@@ -168,9 +175,11 @@ module.exports = async message => {
       try {
         const { dilPaneli } = require("../komutlar/dil");
         // userNeedsLang: false çünkü dil zaten seçili
-        await message.reply(dilPaneli(prefix, { isOwner, userNeedsLang: false, guildNeedsLang })).catch(() => {});
-      } catch {}
-      return message.reply(t(ulang, "onay.gerekli")).catch(() => {});
+        await yanitla(dilPaneli(prefix, { isOwner, userNeedsLang: false, guildNeedsLang }));
+      } catch (e) {
+        console.error(`[MSG] onay paneli olusturulamadi: ${e?.message || e}`);
+      }
+      return yanitla(t(ulang, "onay.gerekli"));
     }
   }
 
