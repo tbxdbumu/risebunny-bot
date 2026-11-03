@@ -3,8 +3,11 @@
  *
  * KURAL: Bot'un dinlediği her gateway olayı burada kayıtlı olmalı.
  * Bot.js içinde doğrudan `client.on(...)` ile eklenen istisnalar:
- *   - messageDelete → snipeCache (bot.js, 187)
- *   - guildMemberAdd/Remove → hoşgeldin kartı (bot.js)
+ *   - messageDelete / messageUpdate → snipeCache, reklam + küfür kontrolü
+ *   - channelCreate / channelDelete → kanal koruma
+ *   - inviteCreate → davet önbelleği
+ *   - guildMemberAdd/Remove → hoşgeldin kartı
+ * (events/ altında bu olaylar için dosya yok; burada da tekrar bağlanmaz.)
  *
  * Discord.js v14 olay adları v13'ten farklı: mesaj olayı artık
  * `messageCreate` (eskiden `message`). Eski adı kullanmak client.on()'u
@@ -29,11 +32,6 @@ const OLAYLAR = [
   { ad: "messageReactionRemove", dosya: "messageReactionRemove" },
   { ad: "voiceStateUpdate", dosya: "voiceStateUpdate" }, // ★ geçici ses kanalları
   { ad: "guildMemberUpdate", dosya: "guildMemberUpdate" }, // nikâh/isim log + rol alma otomasyonu
-  { ad: "channelCreate", dosya: "channelCreate" },
-  { ad: "channelDelete", dosya: "channelDelete" },
-  { ad: "inviteCreate", dosya: "inviteCreate" }, // davet takibi (r!davetlerim)
-  { ad: "messageDelete", dosya: "messageDelete" }, // otomasyon tetiği + starboard temizliği
-  { ad: "messageUpdate", dosya: "messageUpdate" },
 ];
 
 /** Bir kez çalışanlar */
