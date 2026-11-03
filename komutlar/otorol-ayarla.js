@@ -1,33 +1,77 @@
-const Discord = require('discord.js');
-const db = require('croxydb')
+/**
+ * komutlar/otorol-ayarla.js — Otorol
+ *
+ * KULLANIM
+ *   r!otorol-ayarla @rol [#bildirim]   → otorolü açar (kanal opsiyonel)
+ *   r!otorol-ayarla @rol --mevcut      → mevcut üyelere de ver
+ *   r!otorol-ayarla sıfırla            → kapat
+ *
+ * DB (tek kaynak): `otoRL_<gid>` (rol), `otoRK_<gid>` (bildirim kanalı).
+ * `guildMemberAdd` bu anahtarları okur.
+ */
+const Discord = require("discord.js");
+const db = require("croxydb");
 const { getLangSync, t } = require("../dil");
-exports.run = async (client, message, args) => {
-  const lang = getLangSync(message.author.id); 
-const ayarlar = require("../ayarlar.json");
-let prefix = await db.fetch(`prefix.${message.guild.id}`) || ayarlar.prefix     
-let rol = message.mentions.roles.first() 
-let kanal = message.mentions.channels.first()
-if (!message.member.permissions.has(Discord.PermissionFlagsBits.Administrator)) return message.channel.send(t(lang, "sistem.yonetici"));
- 
- if(!rol) return message.channel.send((lang === "en" ? ` Mention a role.\nExample: ${prefix}autorole-set @role #channel` : ` Bir rol etiketlemelisin.\nÖrnek kullanım: ${prefix}otorol-ayarla @rol #kanal`))
- 
- if(!kanal) return message.channel.send((lang === "en" ? ` Mention a channel.\nExample: ${prefix}autorole-set @role #channel` : ` Bir kanal etiketlemelisin.\nÖrnek kullanım: ${prefix}otorol-ayarla @rol #kanal`))
- 
-  message.channel.send((lang === "en" ? ` Autorole enabled. Role set to **${rol}**, channel set to **${kanal}**.` : ` Otorol başarıyla aktif edildi. Otorol rolü **${rol}** olarak ayarlandı. Otorol kanalı **${kanal}** olarak ayarlandı.`))
 
- 
-  db.set(`otoRL_${message.guild.id}`, rol.id)  
-  db.set(`otoRK_${message.guild.id}`, kanal.id) 
+exports.run = async (client, message, args) => {
+  const lang = getLangSync(message.author.id);
+  const gid = message.guild.id;
+
+  if (!message.member.permissions.has(Discord.PermissionFlagsBits.Administrator))
+    return message.reply(t(lang, "sistem.yonetici"));
+
+  const alt = (args[0] || "").toLowerCase();
+  if (["sıfırla", "sifirla", "kapat", "reset"].includes(alt)) {
+    const rol = db.fetch(`otoRL_${gid}`);
+    if (!rol) return message.reply(t(lang, "otorol.zatenKapali"));
+    db.delete(`otoRL_${gid}`);
+    db.delete(`otoRK_${gid}`);
+    return message.reply(t(lang, "otorol.kapatildi"));
+  }
+
+  const rol = message.mentions.roles.first();
+  if (!rol) return message.reply(t(lang, "otorol.rolGerek"));
+
+  const kanal = message.mentions.channels.first() || null;
+  if (args.includes("--kanal") && !kanal) return message.reply(t(lang, "otorol.kanalGerek"));
+
+  // Rol hiyerarşisi kontrolü
+  if (rol.position >= message.guild.members.me.roles.highest.position)
+    return message.reply(t(lang, "otorol.rolYuksek"));
+
+  if (!message.guild.members.me.permissions.has(Discord.PermissionFlagsBits.ManageRoles))
+    return message.reply(t(lang, "tepkirol.botYetki"));
+
+  db.set(`otoRL_${gid}`, rol.id);
+  if (kanal) db.set(`otoRK_${gid}`, kanal.id);
+  else db.delete(`otoRK_${gid}`);
+
+  await message.reply(t(lang, "otorol.ayarlandi", {
+    rol: `<@&${rol.id}>`,
+    kanal: kanal ? `<#${kanal.id}>` : "—"
+  }));
+
+  // Mevcut üyelere uygula (isteğe bağlı ama GUI'de sık istenen)
+  if (args.includes("--mevcut") || args.includes("--all")) {
+    let ok = 0;
+    for (const [, m] of message.guild.members.cache) {
+      if (m.user.bot || m.roles.cache.has(rol.id)) continue;
+      try { await m.roles.add(rol.id, "Otorol: mevcut üyeler"); ok++; } catch {}
+      if (ok % 40 === 0) await new Promise(r => setTimeout(r, 100));
+    }
+    message.channel.send(t(lang, "otorol.hepsiVerildi", { adet: ok, rol: `<@&${rol.id}>` })).catch(() => {});
+  }
 };
+
 exports.conf = {
-    enabled: true,
-    guildOnly: false,
-    permLevel: 0,
-    aliases: ['otorol-ayarla']
-  };
-  
-  exports.help = {
-    name: 'otorol-ayarla',
-    description: 'Türkiyenin Saatini Gösterir',
-    usage: 'gç'
-  };
+  enabled: true,
+  guildOnly: true,
+  permLevel: 0,
+  aliases: ["otorol-ayarla", "autorole-set"]
+};
+
+exports.help = {
+  name: "otorol-ayarla",
+  description: "Sunucuya katılan herkese otomatik rol verir.",
+  usage: "otorol-ayarla @rol [#kanal] [--mevcut]"
+};

@@ -1,34 +1,36 @@
-const Discord = require('discord.js');
-const { PermissionsBitField } = require('discord.js');
-const db = require('croxydb');
+/**
+ * komutlar/otorol-sıfırla.js — Otorol kapat
+ *
+ * KULLANIM:  r!otorol-kapat  (alias: r!otorol-sıfırla)
+ */
+const { PermissionFlagsBits } = require("discord.js");
+const db = require("croxydb");
 const { getLangSync, t } = require("../dil");
 
-exports.run = (client, message, args) => {
+exports.run = async (client, message) => {
   const lang = getLangSync(message.author.id);
-    // v14 yetki kontrolü
-    if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-        return message.channel.send(t(lang, "sistem.yonetici"));
-    }
+  const gid = message.guild.id;
 
-    const rol = db.fetch(`otoRL_${message.guild.id}`);
-    if (!rol) return message.reply((lang === "en" ? ` Autorole is already off.` : ` Otorol sistemi zaten kapalı.`));
+  if (!message.member.permissions.has(PermissionFlagsBits.Administrator))
+    return message.reply(t(lang, "sistem.yonetici"));
 
-    message.channel.send((lang === "en" ? ` Autorole reset successfully.` : ` Otorol sistemi başarıyla sıfırlandı.`));
+  const rol = db.fetch(`otoRL_${gid}`);
+  if (!rol) return message.reply(t(lang, "otorol.zatenKapali"));
 
-    db.delete(`otoRL_${message.guild.id}`);
-    db.delete(`otoRK_${message.guild.id}`);
-    db.delete(`otoRM_${message.guild.id}`);
+  db.delete(`otoRL_${gid}`);
+  db.delete(`otoRK_${gid}`);
+  return message.reply(t(lang, "otorol.kapatildi"));
 };
 
 exports.conf = {
-    enabled: true,
-    guildOnly: false,
-    permLevel: 0,
-    aliases: ['otorol-sıfırla']
+  enabled: true,
+  guildOnly: true,
+  permLevel: 0,
+  aliases: ["otorol-sıfırla", "otorol-sifirla", "autorole-reset"]
 };
 
 exports.help = {
-    name: 'otorol-kapat',
-    description: 'Türkiyenin Saatini Gösterir',
-    usage: 'gç'
+  name: "otorol-kapat",
+  description: "Otorol sistemini kapatır.",
+  usage: "otorol-kapat"
 };

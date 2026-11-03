@@ -16,7 +16,11 @@ const diller = {
   en: require("./en")
 };
 
-const VARSAYILAN = "tr";
+/* Varsayılan dil: İNGİLİZCE.
+   Kullanıcı kaydı yoksa (`language_<id>`) veya sunucu dili seçilmemişse
+   (`slanguage_<gid>`) bot İngilizce cevap verir. Dil seçim paneli hâlâ
+   ilk kullanımda sunulur; seçim yapılırsa o geçerli olur. */
+const VARSAYILAN = "en";
 const GECERLI = Object.keys(diller);
 
 function normalizeLang(lang) {

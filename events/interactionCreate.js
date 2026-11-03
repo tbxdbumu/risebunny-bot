@@ -48,6 +48,141 @@ module.exports = async (interaction) => {
         const handled = await handleIletisimInteraction(interaction, interaction.client);
         if (handled) return;
       }
+
+      /* ── TEPKİ ROL BUTONLARI (rr_<rolId>) ───────────────────────────── */
+      if (interaction.isButton() && cid.startsWith("rr_")) {
+        const rolId = cid.slice(3);
+        const msgId = interaction.message?.id;
+        const ulang = await getLang(interaction.user.id);
+        const { butonIsle } = require("../util/rol");
+        const sonuc = await butonIsle(interaction, msgId, rolId).catch(() => null);
+        const mesaj = {
+          "rol-verildi": t(ulang, "tepkirol.rolVerildi"),
+          "rol-alindi": t(ulang, "tepkirol.rolAlindi"),
+          "rol-yok": t(ulang, "tepkirol.rolYokUye"),
+          "tek-secim": t(ulang, "tepkirol.kullaniciTekSecim")
+        }[sonuc] || null;
+        return interaction.reply({ content: mesaj || t(ulang, "ortak.hata"), ephemeral: true }).catch(() => {});
+      }
+
+      /* ── TEPKİ ROL WIZARD BUTONLARI (rrw_...) ───────────────────────── */
+      if (interaction.isButton() && cid.startsWith("rrw_")) {
+        const ulang = await getLang(interaction.user.id);
+        if (!interaction.member?.permissions?.has(PermissionFlagsBits.ManageRoles))
+          return interaction.reply({ content: t(ulang, "tepkirol.yetki"), ephemeral: true }).catch(() => {});
+
+        const { EmbedBuilder: EB, ActionRowBuilder: ARB, ButtonBuilder: BB, ButtonStyle: BS } = require("discord.js");
+        const dbx = require("croxydb");
+        const gid = interaction.guildId;
+        const TL = `tepkirol_taslak.${gid}`;
+        const taslak = dbx.fetch(TL) || { tur: "emoji", secim: "cok", baslik: "", aciklama: "", roller: [] };
+        const rolMod = require("../util/rol");
+
+        if (cid === "rrw_mode_emoji") taslak.tur = "emoji";
+        if (cid === "rrw_mode_buton") taslak.tur = "buton";
+        if (cid === "rrw_secim") taslak.secim = taslak.secim === "tek" ? "cok" : "tek";
+        dbx.set(TL, taslak);
+
+        if (cid === "rrw_title") {
+          const { ModalBuilder, TextInputBuilder, TextInputStyle } = require("discord.js");
+          const modal = new ModalBuilder().setCustomId("rrw_modal_title").setTitle(t(ulang, "tepkirol.baslikEtiket"));
+          modal.addComponents(new ARB().addComponents(
+            new TextInputBuilder().setCustomId("v").setLabel(t(ulang, "tepkirol.baslikEtiket"))
+              .setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(200)
+          ));
+          return interaction.showModal(modal).catch(() => {});
+        }
+
+        if (cid === "rrw_publish") {
+          if (!taslak.roller.length)
+            return interaction.reply({ content: t(ulang, "tepkirol.onceRol"), ephemeral: true }).catch(() => {});
+          const kanal = interaction.channel;
+          const gonderi = await rolMod.rolMesajiGonder(interaction.client, interaction.guild, kanal, taslak, ulang).catch(() => null);
+          dbx.delete(TL);
+          if (!gonderi) return interaction.reply({ content: t(ulang, "tepkirol.gonderilemez"), ephemeral: true }).catch(() => {});
+          return interaction.update({
+            embeds: [new EB().setColor("Green").setDescription(t(ulang, "tepkirol.yayinda", { url: gonderi.url, id: gonderi.id }))],
+            components: []
+          }).catch(() => {});
+        }
+
+        // Görünümü yeniden çiz
+        const roller = taslak.roller.length
+          ? taslak.roller.map((r, i) => `${i + 1}. ${r.emoji || `[${(r.label || "").slice(0, 40)}]`} → <@&${r.rolId}>`).join("\n")
+          : t(ulang, "tepkirol.rolYok");
+        const embed = new EB().setColor("#ee7621")
+          .setTitle(t(ulang, "tepkirol.baslik"))
+          .setDescription(
+            `**${t(ulang, "tepkirol.tur")}:** ${taslak.tur === "buton" ? t(ulang, "tepkirol.buton") : t(ulang, "tepkirol.emojiTepki")}\n` +
+            `**${t(ulang, "tepkirol.secim")}:** ${taslak.secim === "tek" ? t(ulang, "tepkirol.tek") : t(ulang, "tepkirol.cok")}\n` +
+            `**${t(ulang, "tepkirol.baslikEtiket")}:** ${taslak.baslik || "—"}\n\n` +
+            `**${t(ulang, "tepkirol.rollerSayi", { n: taslak.roller.length, max: rolMod.MAX_ROL })}:**\n${roller.slice(0, 3000)}`
+          ).setFooter({ text: t(ulang, "tepkirol.footer") });
+
+        const row = new ARB().addComponents(
+          new BB().setCustomId("rrw_mode_emoji").setLabel(t(ulang, "tepkirol.emojiTepki")).setStyle(BS.Secondary).setEmoji("😀"),
+          new BB().setCustomId("rrw_mode_buton").setLabel(t(ulang, "tepkirol.buton")).setStyle(BS.Secondary).setEmoji("🔘"),
+          new BB().setCustomId("rrw_secim").setLabel(t(ulang, "tepkirol.secim")).setStyle(BS.Secondary).setEmoji("🎚️"),
+          new BB().setCustomId("rrw_title").setLabel(t(ulang, "tepkirol.baslikEtiket")).setStyle(BS.Primary).setEmoji("📝"),
+          new BB().setCustomId("rrw_publish").setLabel(ulang === "en" ? "Publish" : "Yayınla").setStyle(BS.Success).setEmoji("✅")
+        );
+        return interaction.update({ embeds: [embed], components: [row] }).catch(() => {});
+      }
+
+      /* ── EMBED OLUŞTURUCU (embed_gonder / embed_duzenle) ────────────── */
+      if (interaction.isButton() && (cid === "embed_gonder" || cid === "embed_duzenle")) {
+        const ulang = await getLang(interaction.user.id);
+        if (!interaction.member?.permissions?.has(PermissionFlagsBits.ManageMessages))
+          return interaction.reply({ content: t(ulang, "embed.yetki"), ephemeral: true }).catch(() => {});
+
+        const embedMod = require("../komutlar/embed");
+        const { EmbedBuilder: EB, ActionRowBuilder: ARB } = require("discord.js");
+        const gid = interaction.guildId;
+        const d = embedMod.taslakGetir(gid);
+
+        if (cid === "embed_gonder") {
+          if (!d.baslik && !d.aciklama && !d.alanlar?.length)
+            return interaction.reply({ content: t(ulang, "embed.bosTaslak"), ephemeral: true }).catch(() => {});
+          const kayitKanal = require("croxydb").fetch(`embed_kanal.${gid}`);
+          const kanal = (kayitKanal && interaction.guild.channels.cache.get(kayitKanal)) || interaction.channel;
+          const gonderi = await kanal.send({ embeds: [embedMod.embedOlustur(d, ulang)] }).catch(() => null);
+          if (!gonderi)
+            return interaction.reply({ content: t(ulang, "embed.gonderHata"), ephemeral: true }).catch(() => {});
+          return interaction.update({
+            embeds: [new EB().setColor("Green").setDescription(t(ulang, "embed.gonderildi", { url: gonderi.url }))],
+            components: []
+          }).catch(() => {});
+        }
+
+        // Düzenle → modal
+        const { ModalBuilder, TextInputBuilder, TextInputStyle } = require("discord.js");
+        const modal = new ModalBuilder().setCustomId("embed_modal").setTitle(t(ulang, "embed.baslik"));
+        modal.addComponents(
+          new ARB().addComponents(new TextInputBuilder().setCustomId("baslik")
+            .setLabel(t(ulang, "embed.baslikAlan")).setStyle(TextInputStyle.Short)
+            .setRequired(false).setMaxLength(256).setValue(d.baslik || "")),
+          new ARB().addComponents(new TextInputBuilder().setCustomId("aciklama")
+            .setLabel(t(ulang, "embed.aciklamaAlan")).setStyle(TextInputStyle.Paragraph)
+            .setRequired(false).setMaxLength(4000).setValue(d.aciklama || "")),
+          new ARB().addComponents(new TextInputBuilder().setCustomId("renk")
+            .setLabel(t(ulang, "embed.renkAlan")).setStyle(TextInputStyle.Short)
+            .setRequired(false).setMaxLength(9).setValue(d.renk || "#ee7621")),
+          new ARB().addComponents(new TextInputBuilder().setCustomId("resim")
+            .setLabel(t(ulang, "embed.resimAlan")).setStyle(TextInputStyle.Short)
+            .setRequired(false).setValue(d.resim || "")),
+          new ARB().addComponents(new TextInputBuilder().setCustomId("altbilgi")
+            .setLabel(t(ulang, "embed.altbilgiAlan")).setStyle(TextInputStyle.Short)
+            .setRequired(false).setMaxLength(200).setValue(d.altbilgi || ""))
+        );
+        return interaction.showModal(modal).catch(() => {});
+      }
+
+      /* ── TOPLU ROL ONAY BUTONLARI (trv_yes_/trv_no_) ────────────────── */
+      if (interaction.isButton() && (cid.startsWith("trv_yes_") || cid.startsWith("trv_no_"))) {
+        const ulang = await getLang(interaction.user.id);
+        const { onayIsle } = require("../komutlar/toplurol");
+        return onayIsle(interaction.client, interaction, ulang);
+      }
     }
     if (interaction.isStringSelectMenu()) {
       if (interaction.customId === "dil_sec") {
@@ -381,11 +516,19 @@ module.exports = async (interaction) => {
             const uye = await interaction.guild.members.fetch(opener).catch(() => null);
             if (uye) await kanal.permissionOverwrites.edit(uye, { ViewChannel: true, SendMessages: false }).catch(() => {});
           }
+          // Transkript: kanalın izinleri kapanmadan ÖNCE değil, sonra çekilir —
+          // bot hâlâ okuyabildiği için sorun yok.
+          require("../util/transcript")
+            .otomatikTranskript(interaction.client, kanal, { kapatanId: interaction.user.id })
+            .catch(() => {});
           await kanal.setName(`closed-${kanal.name.slice(0, 80)}`).catch(() => {});
           await ownerLog(interaction.client, new EmbedBuilder().setColor("Grey").setDescription(`🔒 Bilet kapatıldı: **${interaction.guild.name}** | ${interaction.user.tag} | #${kanal.name}`));
           return interaction.reply({ content: t(lang, "ticket.kapatildi", { kullanici: `${interaction.user}` }) });
         } else {
           await interaction.reply({ content: t(lang, "ticket.silinecek") });
+          // Silmeden hemen önce transkript al (kanal gidince geçmiş kaybolur)
+          const { otomatikTranskript } = require("../util/transcript");
+          await otomatikTranskript(interaction.client, kanal, { kapatanId: interaction.user.id }).catch(() => {});
           const kayit = db.fetch(`ticket.${interaction.guild.id}.${kanal.id}`);
           if (kayit?.acan && typeof db.delete === "function") {
             try { db.delete(`ass.${interaction.guild.id}.${kayit.acan}`); db.delete(`ticket.${interaction.guild.id}.${kanal.id}`); } catch {}
@@ -776,6 +919,48 @@ module.exports = async (interaction) => {
   }
 
   // Modal submit (ileride ticket sebep modalı için hazır)
+  if (interaction.isModalSubmit() && interaction.customId === "embed_modal") {
+    const ulang = await getLang(interaction.user.id);
+    if (!interaction.member?.permissions?.has(PermissionFlagsBits.ManageMessages))
+      return interaction.reply({ content: t(ulang, "embed.yetki"), ephemeral: true }).catch(() => {});
+
+    const embedMod = require("../komutlar/embed");
+    const gid = interaction.guildId;
+    const d = embedMod.taslakGetir(gid);
+    const al = (id) => {
+      try { return String(interaction.fields.getTextInputValue(id) || "").trim(); } catch { return ""; }
+    };
+
+    const baslik = al("baslik");
+    const aciklama = al("aciklama");
+    const renkHam = al("renk");
+    const resim = al("resim");
+    const altbilgi = al("altbilgi");
+
+    if (baslik) d.baslik = baslik.slice(0, 256);
+    if (aciklama) d.aciklama = aciklama.slice(0, 4000);
+    if (/^#?[0-9a-f]{6}$/i.test(renkHam)) d.renk = renkHam.startsWith("#") ? renkHam : `#${renkHam}`;
+    d.resim = /^https?:\/\//i.test(resim) ? resim : "";
+    d.altbilgi = altbilgi.slice(0, 2048);
+    embedMod.taslakYaz(gid, d);
+
+    return interaction.reply({
+      embeds: [embedMod.embedOlustur(d, ulang)],
+      ephemeral: true
+    }).catch(() => {});
+  }
+
+  if (interaction.isModalSubmit() && interaction.customId === "rrw_modal_title") {
+    const ulang = await getLang(interaction.user.id);
+    const dbx = require("croxydb");
+    const gid = interaction.guildId;
+    const TL = `tepkirol_taslak.${gid}`;
+    const taslak = dbx.fetch(TL) || { tur: "emoji", secim: "cok", baslik: "", aciklama: "", roller: [] };
+    taslak.baslik = String(interaction.fields.getTextInputValue("v") || "").slice(0, 200);
+    dbx.set(TL, taslak);
+    return interaction.reply({ content: t(ulang, "tepkirol.baslikEtiket"), ephemeral: true }).catch(() => {});
+  }
+
   if (interaction.isModalSubmit() && interaction.customId === "ticket_sebep") {
       const sebep = interaction.fields.getTextInputValue("sebep") || "destek";
       const { acBilet } = require("../komutlar/ticket");
