@@ -1,0 +1,12 @@
+# RiseBunny bot deposu — satır sonu / LFS politikası
+#
+# ESKİ HALİ: şablondan gelme Unity + git-LFS kurallarıydı (*.png, *.dll için
+# filter=lfs; *.unity, *.cs için merge/diff driver'ları). Bu repoda tek bir ikili
+# dosya bile yok; ama kural durduğu için ileride eklenecek bir .png sessizce
+# LFS'e gidip GitHub'da bozuk (sadece pointer dosyası) görünürdü. Kaldırıldı.
+#
+# BİLİNÇLİ OLARAK `text` / `eol` / `-binary` kuralı YOK:
+# Windows'ta core.autocrlf=true olduğu için dosyalar diskte CRLF, index'te LF.
+# Buraya bir `text` veya `-text` kuralı eklemek tüm .js/.json dosyalarını
+# yeniden normalize eder ve boş yere "bütün dosya değişmiş" diff'i üretir.
+# Bir kural eklemeyi düşünüyorsan önce: git add --renormalize . ile dene.

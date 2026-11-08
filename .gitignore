@@ -1,0 +1,31 @@
+# --- SIRLAR (asla commit edilmez) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*service-account*.json
+*service-account*.txt
+FIREBASE_SERVICE_ACCOUNT*.txt
+firebase-service-account.json
+**/credentials.json
+
+# --- Bagimliliklar / build ---
+node_modules/
+package-lock.json
+*.log
+*.rar
+*.zip
+*.7z
+json.sqlite
+quickdb.json
+database.json
+
+# --- Gecici / test ---
+_rb-*.js
+_rb-*.json
+*.bak
+*.yedek.*
+.yedek.*
+test/
+scratch/
